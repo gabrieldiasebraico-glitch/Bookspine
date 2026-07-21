@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manage Vocabulary Maps</title>
+    <link rel="icon" href="/assets/bookspine-logo.ico">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body class="page-shell">
+    <header class="app-head">
+      <a class="app-title" href="/">Vocabulary Maps</a>
+      <button id="menuButton" class="menu-button" type="button" aria-expanded="false" aria-controls="navMenu" aria-label="Open navigation">â˜°</button>
+      <nav id="navMenu" class="nav-menu" aria-label="Navigation">
+        <a href="/">Upload</a>
+        <a href="/viewer.html">Map Viewer</a>
+        <a href="/word-stats.html">Word Stats</a>
+        <a href="/manage-maps.html">Manage Maps</a>
+      </nav>
+    </header>
+    <main class="manage-page">
+      <section class="manage-list" aria-label="Map list">
+        <div class="manage-filters">
+          <label class="field stacked">
+            <span>Search</span>
+            <input id="mapSearch" type="search">
+          </label>
+          <label class="field stacked">
+            <span>Status</span>
+            <select id="mapStatusFilter">
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="excluded">Excluded</option>
+            </select>
+          </label>
+        </div>
+        <div class="table-wrap manage-table-wrap">
+          <table id="manageMapTable"></table>
+        </div>
+      </section>
+      <section class="manage-detail" aria-label="Map actions">
+        <div class="detail-heading">
+          <h2 id="selectedMapTitle">No map selected</h2>
+          <span id="selectedMapStatus" class="status-pill"></span>
+        </div>
+        <label class="field stacked">
+          <span>Book name</span>
+          <input id="bookNameInput" type="text">
+        </label>
+        <label class="field stacked">
+          <span>Map name</span>
+          <input id="mapNameInput" type="text">
+        </label>
+        <div class="manage-actions">
+          <button id="renameMap" type="button">Rename</button>
+          <button id="excludeMap" type="button">Exclude</button>
+          <button id="duplicateMap" type="button">Duplicate</button>
+        </div>
+        <div class="export-row">
+          <label class="field stacked">
+            <span>Export</span>
+            <select id="exportFormat">
+              <option value="tiff">TIFF</option>
+              <option value="png">PNG</option>
+              <option value="pdf">PDF</option>
+            </select>
+          </label>
+          <button id="exportMap" type="button">Export</button>
+        </div>
+        <dl id="mapMetadata" class="metadata-list"></dl>
+        <span id="manageStatus" class="generation-status"></span>
+      </section>
+    </main>
+    <script src="/nav.js"></script>
+    <script src="/manage-maps.js"></script>
+  </body>
+</html>

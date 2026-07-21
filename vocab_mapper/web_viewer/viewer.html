@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vocabulary Map Viewer</title>
+    <link rel="icon" href="/assets/bookspine-logo.ico">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body class="viewer-shell">
+    <header class="app-head">
+      <a class="app-title" href="/">Vocabulary Maps</a>
+      <button id="menuButton" class="menu-button" type="button" aria-expanded="false" aria-controls="navMenu" aria-label="Open navigation">☰</button>
+      <nav id="navMenu" class="nav-menu" aria-label="Navigation">
+        <a href="/">Upload</a>
+        <a href="/viewer.html">Map Viewer</a>
+        <a href="/word-stats.html">Word Stats</a>
+        <a href="/manage-maps.html">Manage Maps</a>
+      </nav>
+    </header>
+    <header class="toolbar">
+      <label class="field">
+        <span>Book</span>
+        <select id="bookSelect"></select>
+      </label>
+      <label class="field">
+        <span>Map</span>
+        <select id="mapTypeSelect"></select>
+      </label>
+      <button id="zoomOut" type="button" aria-label="Zoom out">-</button>
+      <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
+      <button id="fit" type="button">Fit</button>
+      <button id="actualSize" type="button">1 px</button>
+      <label class="field compact">
+        <span>Font</span>
+        <input id="fontSize" type="range" min="8" max="28" value="12">
+        <output id="fontSizeValue">12</output>
+      </label>
+      <label class="field compact">
+        <span>Widget</span>
+        <input id="panelSize" type="range" min="160" max="480" value="300">
+        <output id="panelSizeValue">300</output>
+      </label>
+      <label class="check"><input id="showWords" type="checkbox" checked> Words</label>
+      <label class="check"><input id="showStructure" type="checkbox" checked> Structure</label>
+      <label class="check"><input id="classDiscrimination" type="checkbox" checked> Class norm</label>
+      <button id="toggleSummary" type="button" aria-pressed="true">Hide summary</button>
+      <span id="status" class="status"></span>
+    </header>
+    <aside id="mapInfo" class="map-info" aria-live="polite"></aside>
+    <main class="viewer">
+      <canvas id="viewerCanvas"></canvas>
+    </main>
+    <script src="/nav.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

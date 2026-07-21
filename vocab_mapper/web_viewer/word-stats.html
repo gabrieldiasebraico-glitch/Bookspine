@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Word Stats Visualizer</title>
+    <link rel="icon" href="/assets/bookspine-logo.ico">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body class="page-shell">
+    <header class="app-head">
+      <a class="app-title" href="/">Vocabulary Maps</a>
+      <button id="menuButton" class="menu-button" type="button" aria-expanded="false" aria-controls="navMenu" aria-label="Open navigation">☰</button>
+      <nav id="navMenu" class="nav-menu" aria-label="Navigation">
+        <a href="/">Upload</a>
+        <a href="/viewer.html">Map Viewer</a>
+        <a href="/word-stats.html">Word Stats</a>
+        <a href="/manage-maps.html">Manage Maps</a>
+      </nav>
+    </header>
+    <main class="stats-page">
+      <section class="stats-controls" aria-label="Word stats controls">
+        <label class="field stacked">
+          <span>Saved CSV</span>
+          <select id="savedCsvSelect"></select>
+        </label>
+        <div class="drop-zone csv-drop">
+          <input id="csvInput" type="file" accept=".csv,text/csv" hidden>
+          <button id="chooseCsv" type="button">Choose CSV</button>
+          <span id="csvName" class="file-name">No CSV selected</span>
+        </div>
+        <label class="field stacked">
+          <span>Search</span>
+          <input id="rowFilter" type="search" placeholder="All visible columns">
+        </label>
+        <label class="field stacked">
+          <span>Filter Column</span>
+          <select id="filterColumn"></select>
+        </label>
+        <label class="field stacked">
+          <span>Contains</span>
+          <input id="filterText" type="search" placeholder="">
+        </label>
+        <div class="range-row">
+          <label class="field stacked">
+            <span>Min</span>
+            <input id="filterMin" type="number" step="any">
+          </label>
+          <label class="field stacked">
+            <span>Max</span>
+            <input id="filterMax" type="number" step="any">
+          </label>
+        </div>
+        <button id="addFilter" type="button">Add Filter</button>
+        <div id="activeFilters" class="active-filters"></div>
+        <label class="field stacked">
+          <span>Color Scale</span>
+          <select id="colorScale">
+            <option value="linear">Linear</option>
+            <option value="log">Log</option>
+          </select>
+        </label>
+        <label class="field stacked">
+          <span>Columns</span>
+          <select id="columnSelect" multiple size="8"></select>
+        </label>
+        <label class="field stacked">
+          <span>Sort</span>
+          <select id="sortColumn"></select>
+        </label>
+        <label class="field stacked">
+          <span>Order</span>
+          <select id="sortDirection">
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+        </label>
+        <label class="field stacked">
+          <span>Color Column</span>
+          <select id="colorColumn"></select>
+        </label>
+        <div class="color-row">
+          <label class="field stacked">
+            <span>Low</span>
+            <input id="lowColor" type="color" value="#2f6fbd">
+          </label>
+          <label class="field stacked">
+            <span>Mid</span>
+            <input id="midColor" type="color" value="#f7f7f2">
+          </label>
+          <label class="field stacked">
+            <span>High</span>
+            <input id="highColor" type="color" value="#c4473d">
+          </label>
+        </div>
+        <span id="statsStatus" class="generation-status"></span>
+      </section>
+      <section class="stats-main">
+        <section class="table-wrap" aria-label="Word stats table">
+          <table id="statsTable"></table>
+        </section>
+        <section class="kde-panel" aria-label="KDE chart">
+          <div class="kde-toolbar">
+            <label class="field">
+              <span>KDE</span>
+              <select id="kdeGroup">
+                <option value="mixed">Mixed</option>
+                <option value="semantic">Semantic</option>
+                <option value="functional">Functional</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Metric</span>
+              <select id="kdeMetric"></select>
+            </label>
+            <button id="kdeConfigButton" type="button">Configure</button>
+          </div>
+          <div id="kdeConfigPanel" class="kde-config hidden">
+            <label class="field stacked">
+              <span>X Scale</span>
+              <select id="kdeScale">
+                <option value="linear">Linear</option>
+                <option value="log">Log</option>
+              </select>
+            </label>
+            <label class="field stacked">
+              <span>Y Scale</span>
+              <select id="kdeYScale">
+                <option value="linear">Linear</option>
+                <option value="log">Log</option>
+              </select>
+            </label>
+            <label class="field stacked">
+              <span>Vertical Lines</span>
+              <input id="kdeVerticalLines" type="number" min="0" max="20" value="6">
+            </label>
+            <label class="field stacked">
+              <span>Horizontal Lines</span>
+              <input id="kdeHorizontalLines" type="number" min="0" max="20" value="5">
+            </label>
+            <label class="check"><input id="kdeMeanLine" type="checkbox" checked> Mean</label>
+            <label class="check"><input id="kdeMedianLine" type="checkbox" checked> Median</label>
+          </div>
+          <canvas id="kdeCanvas"></canvas>
+        </section>
+      </section>
+    </main>
+    <script src="/nav.js"></script>
+    <script src="/word-stats.js"></script>
+  </body>
+</html>
