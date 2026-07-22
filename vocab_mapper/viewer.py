@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from concurrent.futures import Future
 import csv
 import hashlib
 import json
@@ -27,8 +28,8 @@ from vocab_mapper.stats import (
 )
 from vocab_mapper.word_metrics_csv import prepare_word_metrics_csv
 from vocab_mapper.viewer_rendering import (
-    metric_color_maxima,
     metric_color,
+    metric_color_scale,
     metric_palette,
     metric_values,
 )
@@ -50,7 +51,6 @@ from vocab_mapper.metrics import (
     is_excluded_metric,
     is_ngram_frequency_metric,
     is_current_metric,
-    metric_column_candidates,
     metric_definition,
     metric_label,
     metric_spec,
@@ -1097,10 +1097,35 @@ class Segment:
     value: int
 
 
+MapLoadKey = tuple[str, str, str, int | None, int | None]
+
+
+def _entry_csv_path(entry: dict[str, object]) -> Path:
+    return PROJECT_ROOT / str(entry["csvPath"]).replace("/", "\\")
+
+
+def _map_load_key(entry: dict[str, object]) -> MapLoadKey:
+    csv_path = _entry_csv_path(entry)
+    try:
+        stat = csv_path.stat()
+        file_size: int | None = stat.st_size
+        modified_ns: int | None = stat.st_mtime_ns
+    except OSError:
+        file_size = None
+        modified_ns = None
+    return (
+        str(csv_path),
+        str(entry.get("metric") or ""),
+        str(entry.get("scale") or "linear"),
+        file_size,
+        modified_ns,
+    )
+
+
 class LoadedMap:
     def __init__(self, entry: dict[str, object]) -> None:
         self.entry = entry
-        self.csv_path = PROJECT_ROOT / str(entry["csvPath"]).replace("/", "\\")
+        self.csv_path = _entry_csv_path(entry)
         self.metric = str(entry["metric"])
         self.scale = str(entry.get("scale") or "linear")
         self.words: list[str] = []
@@ -1108,6 +1133,7 @@ class LoadedMap:
         self.word_classes: list[str] = []
         self.rows: list[dict[str, str]] = []
         self._mode_cache: dict[bool, tuple[list[float], list[tuple[int, int, int]]]] = {}
+        self._mode_lock = threading.Lock()
         self.chapters: list[int] = []
         self.paragraphs: list[int] = []
         self.sentences: list[int] = []
@@ -1153,42 +1179,36 @@ class LoadedMap:
         self,
         class_discrimination: bool,
     ) -> tuple[list[float], list[tuple[int, int, int]]]:
-        cached = self._mode_cache.get(class_discrimination)
-        if cached is not None:
-            return cached
+        with self._mode_lock:
+            cached = self._mode_cache.get(class_discrimination)
+            if cached is not None:
+                return cached
 
-        values = metric_values(
-            self.rows,
-            self.metric,
-            class_discrimination=class_discrimination,
-        )
-        max_value = (
-            _the_metric_value(self.rows, self.metric)
-            if is_ngram_frequency_metric(self.metric)
-            else max(values) if values else 0
-        )
-        min_value = min(values) if values else 0
-        max_abs_value = max((abs(value) for value in values), default=0)
-        row_max_values = metric_color_maxima(
-            self.rows,
-            values,
-            self.metric,
-            max_value,
-            class_discrimination,
-        )
-        colors = [
-            metric_color(
-                value,
+            values = metric_values(
+                self.rows,
                 self.metric,
-                self.scale,
-                min_value,
-                row_max_values[index],
-                max_abs_value,
+                class_discrimination=class_discrimination,
             )
-            for index, value in enumerate(values)
-        ]
-        self._mode_cache[class_discrimination] = (values, colors)
-        return values, colors
+            color_scale = metric_color_scale(
+                self.rows,
+                values,
+                self.metric,
+                class_discrimination,
+            )
+            colors = [
+                metric_color(
+                    value,
+                    self.metric,
+                    self.scale,
+                    color_scale.min_value,
+                    color_scale.row_max_values[index],
+                    color_scale.max_abs_value,
+                )
+                for index, value in enumerate(values)
+            ]
+            result = (values, colors)
+            self._mode_cache[class_discrimination] = result
+            return result
 
     def viewport(
         self,
@@ -1256,6 +1276,7 @@ class LoadedMap:
 
     def summary(self, class_discrimination: bool = True) -> dict[str, object]:
         values, colors = self._values_and_colors(class_discrimination)
+        entry = self.entry
         total_words = len(self.rows)
         counts = Counter(self.word_classes)
         functional_words = counts.get("functional", 0)
@@ -1269,12 +1290,12 @@ class LoadedMap:
             if colors
             else 0
         )
-        metadata = _book_metadata_for_entry(self.entry)
+        metadata = _book_metadata_for_entry(entry)
         return {
-            "book": self.entry.get("book", ""),
-            "mapType": self.entry.get("mapType", ""),
+            "book": entry.get("book", ""),
+            "mapType": entry.get("mapType", ""),
             "metric": self.metric,
-            "palette": self.entry.get("palette", ""),
+            "palette": entry.get("palette", ""),
             "bibliographic": metadata,
             "wordCounts": {
                 "total": total_words,
@@ -1320,11 +1341,6 @@ def _parse_int(value: str | None, fallback: int) -> int:
         return int(float(value))
     except ValueError:
         return fallback
-
-
-def _parse_float(value: str | None) -> float | None:
-    if value is None or value == "":
-        return None
 
 
 def _class_stats(values: list[float], word_classes: list[str]) -> dict[str, dict[str, float]]:
@@ -1388,23 +1404,6 @@ def _infer_edition(entry: dict[str, object]) -> str:
     if "philosopher" in haystack or "uk version" in haystack:
         return "UK version"
     return "Unknown"
-    try:
-        return float(value)
-    except ValueError:
-        return None
-
-
-def _the_metric_value(rows: list[dict[str, str]], metric: str) -> float:
-    candidates = metric_column_candidates(metric)
-    for row in rows:
-        if row.get("normalized_word", "").lower() != "the":
-            continue
-        for candidate in candidates:
-            value = _parse_float(row.get(candidate))
-            if value is not None:
-                return value
-    values = metric_values(rows, metric)
-    return max(values) if values else 0
 
 
 def _build_segments(values: list[int]) -> list[Segment]:
@@ -1445,14 +1444,38 @@ class ViewerState:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._maps: dict[str, dict[str, object]] = {}
+        self._map_load_keys: dict[str, MapLoadKey] = {}
         self._loaded: dict[str, LoadedMap] = {}
+        self._loading: dict[str, tuple[MapLoadKey, Future[LoadedMap]]] = {}
         self.refresh()
 
     def refresh(self) -> list[dict[str, object]]:
         maps = discover_maps()
+        new_maps = {str(entry["id"]): entry for entry in maps}
+        new_load_keys = {
+            map_id: _map_load_key(entry)
+            for map_id, entry in new_maps.items()
+        }
         with self._lock:
-            self._maps = {str(entry["id"]): entry for entry in maps}
-            self._loaded = {}
+            preserved_loaded: dict[str, LoadedMap] = {}
+            for map_id, loaded in self._loaded.items():
+                if self._map_load_keys.get(map_id) != new_load_keys.get(map_id):
+                    continue
+                new_entry = new_maps[map_id]
+                for field in ("totalRows", "minValue", "maxValue", "maxAbsValue"):
+                    if field in loaded.entry:
+                        new_entry[field] = loaded.entry[field]
+                loaded.entry = new_entry
+                preserved_loaded[map_id] = loaded
+
+            self._loading = {
+                map_id: pending
+                for map_id, pending in self._loading.items()
+                if new_load_keys.get(map_id) == pending[0]
+            }
+            self._maps = new_maps
+            self._map_load_keys = new_load_keys
+            self._loaded = preserved_loaded
         return maps
 
     def maps(self) -> list[dict[str, object]]:
@@ -1461,11 +1484,49 @@ class ViewerState:
 
     def load(self, map_id: str) -> LoadedMap | None:
         with self._lock:
-            if map_id not in self._maps:
+            entry = self._maps.get(map_id)
+            if entry is None:
                 return None
-            if map_id not in self._loaded:
-                self._loaded[map_id] = LoadedMap(self._maps[map_id])
-            return self._loaded[map_id]
+            loaded = self._loaded.get(map_id)
+            if loaded is not None:
+                return loaded
+
+            load_key = self._map_load_keys[map_id]
+            pending = self._loading.get(map_id)
+            if pending is None or pending[0] != load_key:
+                future: Future[LoadedMap] = Future()
+                self._loading[map_id] = (load_key, future)
+                entry_snapshot = dict(entry)
+                owns_load = True
+            else:
+                future = pending[1]
+                entry_snapshot = {}
+                owns_load = False
+
+        if not owns_load:
+            return future.result()
+
+        try:
+            loaded = LoadedMap(entry_snapshot)
+        except BaseException as exc:
+            with self._lock:
+                if self._loading.get(map_id) == (load_key, future):
+                    del self._loading[map_id]
+            future.set_exception(exc)
+            raise
+
+        with self._lock:
+            if self._loading.get(map_id) == (load_key, future):
+                if self._map_load_keys.get(map_id) == load_key:
+                    current_entry = self._maps[map_id]
+                    for field in ("totalRows", "minValue", "maxValue", "maxAbsValue"):
+                        if field in loaded.entry:
+                            current_entry[field] = loaded.entry[field]
+                    loaded.entry = current_entry
+                    self._loaded[map_id] = loaded
+                del self._loading[map_id]
+        future.set_result(loaded)
+        return loaded
 
 
 STATE = ViewerState()

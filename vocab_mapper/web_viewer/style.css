@@ -689,6 +689,42 @@ button:hover {
   width: 100%;
 }
 
+@media (max-width: 1200px) {
+  .upload-content {
+    grid-template-columns: clamp(178px, 19vw, 213px) minmax(0, 1fr);
+  }
+
+  .upload-brand {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .upload-logo {
+    height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: left top;
+    width: 100%;
+  }
+
+  .upload-workspace {
+    min-width: 0;
+  }
+
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 1fr);
+  }
+
+  .map-multi-field {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+  }
+
+  .upload-workspace input[type="number"] {
+    width: 100%;
+  }
+}
+
 @media (max-width: 760px) {
   .toolbar {
     align-items: stretch;
@@ -722,13 +758,30 @@ button:hover {
     grid-template-columns: 1fr;
   }
 
+  .upload-page {
+    overflow: visible;
+  }
+
+  .upload-content {
+    height: auto;
+  }
+
   .upload-brand {
+    height: auto;
     justify-content: flex-start;
+    overflow: visible;
     width: 100%;
   }
 
   .upload-logo {
     height: 140px;
+    object-fit: contain;
+    object-position: left top;
+    width: auto;
+  }
+
+  .upload-workspace {
+    height: auto;
   }
 
   .stats-main {
@@ -736,6 +789,7 @@ button:hover {
   }
 
   .map-multi-field {
+    grid-column: auto;
     grid-row: auto;
   }
 

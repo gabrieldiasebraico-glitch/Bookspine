@@ -3,3 +3,31 @@ __pycache__/
 .venv/
 venv/
 
+# Local configuration, temporary files, and logs
+.codex/
+.tmp*/
+*.log
+*.lnk
+napshot*
+desktop.ini
+Thumbs.db
+
+# Raw or derived research data
+txt books/
+data/
+output/*
+!output/book_metadata.json
+
+# Generated and historical distribution copies
+advisor_viewer_bundle/
+Bookspine_Vocabulary_Maps_Portable/
+vocabulary_map_viewer_portable/
+Vocabulary_maps/
+installers/
+*.zip
+
+# Large editable/exported artifacts
+Bookspine Logo-assets/
+*.pdf
+*.html
+*.gsheet

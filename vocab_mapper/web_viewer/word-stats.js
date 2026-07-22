@@ -44,7 +44,7 @@ const MAX_RENDERED_ROWS = 2000;
 async function loadSavedCsvList() {
   try {
     const response = await fetch("/api/word-stats");
-    const payload = await response.json();
+    const payload = await readJsonResponse(response, "Saved CSVs unavailable.");
     statsState.savedFiles = payload.files || [];
     savedCsvSelect.innerHTML = "";
     const blank = document.createElement("option");
@@ -58,7 +58,7 @@ async function loadSavedCsvList() {
       savedCsvSelect.appendChild(option);
     }
   } catch (error) {
-    setStatsStatus("Saved CSVs unavailable.", true);
+    setStatsStatus(error.message || "Saved CSVs unavailable.", true);
     console.error(error);
   }
 }
@@ -67,8 +67,7 @@ async function loadSavedCsv(fileId) {
   if (!fileId) return;
   try {
     const response = await fetch(`/api/word-stats/${encodeURIComponent(fileId)}`);
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "Could not load CSV.");
+    const payload = await readJsonResponse(response, "Could not load CSV.");
     loadCsvText(payload.content || "", payload.path || payload.name || "Saved CSV");
   } catch (error) {
     setStatsStatus(error.message || "Could not load CSV.", true);

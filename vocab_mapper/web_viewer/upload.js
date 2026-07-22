@@ -41,14 +41,16 @@ function setSelectedFile(file) {
 }
 
 async function loadGenerationOptions() {
+  generateMapsButton.disabled = true;
   try {
     const response = await fetch("/api/generation-options");
-    uploadState.options = await response.json();
+    uploadState.options = await readJsonResponse(response, "Generation options unavailable.");
     populateCorpusOptions();
     populateMetricOptions();
     refreshMetricAvailability();
+    generateMapsButton.disabled = false;
   } catch (error) {
-    setGenerationStatus("Generation options unavailable.", true);
+    setGenerationStatus(error.message || "Generation options unavailable.", true);
     console.error(error);
   }
 }
@@ -139,10 +141,7 @@ async function generateSelectedMaps() {
         publicationYear: publicationYearInput.value ? Number(publicationYearInput.value) : null,
       }),
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.error || "Generation failed.");
-    }
+    const payload = await readJsonResponse(response, "Generation failed.");
     renderResults(payload);
   } catch (error) {
     setGenerationStatus(error.message || "Generation failed.", true);

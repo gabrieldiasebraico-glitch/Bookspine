@@ -7,14 +7,15 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from vocab_mapper.plot_visual_map import (
+from vocab_mapper.plot_visual_map import read_occurrence_rows
+from vocab_mapper.viewer_rendering import (
+    BLACK_WHITE_METRICS,
     metric_color,
+    metric_color_scale,
     metric_palette,
     metric_values,
-    ngram_the_frequency,
-    read_occurrence_rows,
 )
-from vocab_mapper.metrics import is_ngram_frequency_metric, metric_definition, resolve_metric_name
+from vocab_mapper.metrics import metric_definition, resolve_metric_name
 
 
 BLACK = (0, 0, 0)
@@ -68,14 +69,8 @@ def render_annotated_map(
     metric = resolve_metric_name(metric)
     rows = read_occurrence_rows(input_csv)
     values = metric_values(rows, metric)
+    color_scale = metric_color_scale(rows, values, metric, class_discrimination=True)
     height = len(values)
-    min_value = min(values) if values else 0
-    max_value = (
-        ngram_the_frequency(rows, metric)
-        if is_ngram_frequency_metric(metric)
-        else max(values) if values else 0
-    )
-    max_abs_value = max((abs(value) for value in values), default=0)
     total_width = left_margin + map_width + right_margin
 
     image = Image.new("RGB", (total_width, height), BLACK)
@@ -90,7 +85,14 @@ def render_annotated_map(
     for y, value in enumerate(values):
         draw.line(
             (map_x0, y, map_x1, y),
-            fill=metric_color(value, metric, scale, min_value, max_value, max_abs_value),
+            fill=metric_color(
+                value,
+                metric,
+                scale,
+                color_scale.min_value,
+                color_scale.row_max_values[y],
+                color_scale.max_abs_value,
+            ),
         )
 
     draw.line((map_x0 - 1, 0, map_x0 - 1, height - 1), fill=GRAY)
@@ -141,6 +143,9 @@ def render_annotated_map(
         "word_scale_minor_interval": minor_interval,
         "chapter_ticks": chapter_metadata,
         "palette": metric_palette(metric),
+        "frequency_scale_reference": (
+            color_scale.reference if metric in BLACK_WHITE_METRICS else ""
+        ),
     }
     output_path.with_suffix(".json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return metadata

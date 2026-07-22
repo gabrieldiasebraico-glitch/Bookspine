@@ -1,10 +1,176 @@
 import csv
 import gzip
 import shutil
+import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from vocab_mapper import viewer
+
+
+class ViewerStateConcurrencyTests(unittest.TestCase):
+    @staticmethod
+    def map_entry(map_id):
+        return {
+            "id": map_id,
+            "csvPath": f"output/{map_id}.csv",
+            "metric": "book_freq",
+            "scale": "linear",
+        }
+
+    def test_loading_one_map_does_not_block_a_different_map(self):
+        entries = [self.map_entry("slow"), self.map_entry("fast")]
+        slow_started = threading.Event()
+        release_slow = threading.Event()
+        fast_finished = threading.Event()
+        results = {}
+
+        class ControlledLoadedMap:
+            def __init__(self, entry):
+                self.entry = entry
+                if entry["id"] == "slow":
+                    slow_started.set()
+                    release_slow.wait(2)
+
+        with patch.object(viewer, "discover_maps", return_value=entries):
+            state = viewer.ViewerState()
+        with patch.object(viewer, "LoadedMap", ControlledLoadedMap):
+            slow_thread = threading.Thread(
+                target=lambda: results.setdefault("slow", state.load("slow"))
+            )
+
+            def load_fast():
+                results["fast"] = state.load("fast")
+                fast_finished.set()
+
+            fast_thread = threading.Thread(target=load_fast)
+            slow_thread.start()
+            self.assertTrue(slow_started.wait(1))
+            fast_thread.start()
+            try:
+                self.assertTrue(
+                    fast_finished.wait(1),
+                    "A different map was blocked by the slow map load.",
+                )
+            finally:
+                release_slow.set()
+                slow_thread.join(2)
+                fast_thread.join(2)
+
+        self.assertFalse(slow_thread.is_alive())
+        self.assertFalse(fast_thread.is_alive())
+        self.assertEqual(set(results), {"slow", "fast"})
+
+    def test_concurrent_requests_for_one_map_share_one_load(self):
+        entry = self.map_entry("shared")
+        load_started = threading.Event()
+        release_load = threading.Event()
+        construction_count = 0
+        count_lock = threading.Lock()
+        results = []
+
+        class ControlledLoadedMap:
+            def __init__(self, loaded_entry):
+                nonlocal construction_count
+                self.entry = loaded_entry
+                with count_lock:
+                    construction_count += 1
+                load_started.set()
+                release_load.wait(2)
+
+        with patch.object(viewer, "discover_maps", return_value=[entry]):
+            state = viewer.ViewerState()
+        with patch.object(viewer, "LoadedMap", ControlledLoadedMap):
+            first = threading.Thread(target=lambda: results.append(state.load("shared")))
+            second = threading.Thread(target=lambda: results.append(state.load("shared")))
+            first.start()
+            self.assertTrue(load_started.wait(1))
+            second.start()
+            try:
+                second.join(0.1)
+                self.assertTrue(second.is_alive())
+            finally:
+                release_load.set()
+                first.join(2)
+                second.join(2)
+
+        self.assertEqual(construction_count, 1)
+        self.assertEqual(len(results), 2)
+        self.assertIs(results[0], results[1])
+
+    def test_refresh_preserves_unchanged_loaded_maps(self):
+        original_entry = self.map_entry("cached")
+        with patch.object(viewer, "discover_maps", return_value=[original_entry]):
+            state = viewer.ViewerState()
+
+        class CachedMap:
+            def __init__(self, entry):
+                self.entry = entry
+
+        cached = CachedMap(original_entry)
+        cached.entry["totalRows"] = 123
+        state._loaded["cached"] = cached
+        refreshed_entry = {**original_entry, "book": "Updated display name"}
+
+        with patch.object(viewer, "discover_maps", return_value=[refreshed_entry]):
+            maps = state.refresh()
+
+        self.assertIs(state.load("cached"), cached)
+        self.assertIs(cached.entry, maps[0])
+        self.assertEqual(cached.entry["book"], "Updated display name")
+        self.assertEqual(cached.entry["totalRows"], 123)
+
+        changed_entry = {**refreshed_entry, "scale": "log"}
+        with patch.object(viewer, "discover_maps", return_value=[changed_entry]):
+            state.refresh()
+        with patch.object(viewer, "LoadedMap", CachedMap):
+            replacement = state.load("cached")
+
+        self.assertIsNot(replacement, cached)
+
+    def test_concurrent_color_requests_share_one_mode_calculation(self):
+        loaded = viewer.LoadedMap.__new__(viewer.LoadedMap)
+        loaded.rows = [{"normalized_word": "word", "word_class": "semantic"}]
+        loaded.metric = "book_freq"
+        loaded.scale = "linear"
+        loaded._mode_cache = {}
+        loaded._mode_lock = threading.Lock()
+        calculation_started = threading.Event()
+        release_calculation = threading.Event()
+        calculation_count = 0
+        count_lock = threading.Lock()
+        results = []
+
+        def controlled_metric_values(rows, metric, class_discrimination):
+            nonlocal calculation_count
+            with count_lock:
+                calculation_count += 1
+            calculation_started.set()
+            release_calculation.wait(2)
+            return [1.0]
+
+        with patch.object(viewer, "metric_values", controlled_metric_values):
+            first = threading.Thread(
+                target=lambda: results.append(loaded._values_and_colors(False))
+            )
+            second = threading.Thread(
+                target=lambda: results.append(loaded._values_and_colors(False))
+            )
+            first.start()
+            self.assertTrue(calculation_started.wait(1))
+            second.start()
+            try:
+                second.join(0.1)
+                self.assertTrue(second.is_alive())
+            finally:
+                release_calculation.set()
+                first.join(2)
+                second.join(2)
+
+        self.assertEqual(calculation_count, 1)
+        self.assertEqual(len(results), 2)
+        self.assertIs(results[0], results[1])
 
 
 class ViewerGenerationTests(unittest.TestCase):
@@ -64,6 +230,58 @@ class ViewerGenerationTests(unittest.TestCase):
                 row["word"]: row["ngram_f"]
                 for row in csv.DictReader(csv_file)
             }
+
+    def test_interactive_viewer_uses_class_and_global_frequency_maxima(self):
+        input_csv = self.temp_path / "class_scaling.csv"
+        with input_csv.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(
+                csv_file,
+                fieldnames=["normalized_word", "word_class", "fic_ngram_total_freq"],
+            )
+            writer.writeheader()
+            writer.writerows(
+                [
+                    {
+                        "normalized_word": "theory",
+                        "word_class": "semantic",
+                        "fic_ngram_total_freq": "0.5",
+                    },
+                    {
+                        "normalized_word": "house",
+                        "word_class": "semantic",
+                        "fic_ngram_total_freq": "0.25",
+                    },
+                    {
+                        "normalized_word": "the",
+                        "word_class": "functional",
+                        "fic_ngram_total_freq": "0.8",
+                    },
+                    {
+                        "normalized_word": "and",
+                        "word_class": "functional",
+                        "fic_ngram_total_freq": "0.4",
+                    },
+                ]
+            )
+
+        loaded_map = viewer.LoadedMap(
+            {
+                "csvPath": input_csv.as_posix(),
+                "metric": "fic_ngram_total_freq",
+                "scale": "linear",
+            }
+        )
+
+        _values, class_colors = loaded_map._values_and_colors(True)
+        _values, global_colors = loaded_map._values_and_colors(False)
+        self.assertEqual(
+            class_colors,
+            [(255, 255, 255), (128, 128, 128), (255, 255, 255), (128, 128, 128)],
+        )
+        self.assertEqual(
+            global_colors,
+            [(159, 159, 159), (80, 80, 80), (255, 255, 255), (128, 128, 128)],
+        )
 
     def test_discovers_book_only_and_available_ngram_corpora(self):
         self.write_ngram_file("eng_fiction_2019_all_ngram_frequencies.csv")

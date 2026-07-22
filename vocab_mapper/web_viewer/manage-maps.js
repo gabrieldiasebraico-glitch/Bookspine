@@ -25,7 +25,7 @@ function setManageStatus(text, isError = false) {
 
 async function loadMaps(preferredId = manageState.selectedId) {
   const response = await fetch("/api/manage/maps");
-  const payload = await response.json();
+  const payload = await readJsonResponse(response, "Map list unavailable.");
   manageState.maps = payload.maps || [];
   if (preferredId && manageState.maps.some((map) => map.id === preferredId)) {
     manageState.selectedId = preferredId;
@@ -117,10 +117,7 @@ async function postMapAction(action, body = {}) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "Map action failed.");
-  }
+  const payload = await readJsonResponse(response, "Map action failed.");
   manageState.maps = payload.maps || manageState.maps;
   manageState.selectedId = payload.map?.id || map.id;
   renderMapTable();
@@ -204,5 +201,12 @@ exportMapButton.addEventListener("click", () => {
 });
 
 loadMaps().catch((error) => {
-  setManageStatus(error.message || "Map list unavailable.", true);
+  const message = error.message || "Map list unavailable.";
+  manageState.maps = [];
+  manageState.selectedId = "";
+  renderSelectedMap();
+  selectedMapTitle.textContent = "Maps unavailable";
+  manageMapTable.innerHTML = `<tbody><tr><td>${escapeHtml(message)}</td></tr></tbody>`;
+  setManageStatus(message, true);
+  console.error(error);
 });

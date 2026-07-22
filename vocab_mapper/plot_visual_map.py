@@ -9,44 +9,21 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from vocab_mapper.metric_values import row_metric_values
 from vocab_mapper.metrics import (
     BOOK_FREQ,
-    METRIC_SPECS,
-    is_ngram_frequency_metric,
-    metric_column_candidates,
     metric_definition,
     resolve_metric_name,
 )
+from vocab_mapper.viewer_rendering import (
+    BLACK_WHITE_METRICS,
+    DIVERGING_METRICS,
+    MAGENTA_WHITE_GREEN_METRICS,
+    metric_color,
+    metric_color_scale,
+    metric_palette,
+    metric_values,
+)
 
-RED = (220, 0, 0)
-WHITE = (255, 255, 255)
-BLUE = (0, 68, 220)
-MAGENTA = (255, 0, 255)
-GREEN = (0, 160, 0)
-
-METRIC_DEFINITIONS = {
-    spec.name: spec.definition
-    for spec in METRIC_SPECS
-}
-
-NGRAM_FREQUENCY_METRICS = {
-    spec.name
-    for spec in METRIC_SPECS
-    if spec.ngram_frequency
-}
-
-BLACK_WHITE_METRICS = {
-    spec.name
-    for spec in METRIC_SPECS
-    if spec.palette == "black-white"
-}
-MAGENTA_WHITE_GREEN_METRICS: set[str] = set()
-DIVERGING_METRICS = {
-    spec.name
-    for spec in METRIC_SPECS
-    if spec.palette in {"red-white-blue", "magenta-white-green"}
-}
 BIGTIFF_SUFFIXES = {".tif", ".tiff"}
 ROWS_PER_STRIP = 256
 
@@ -54,68 +31,6 @@ ROWS_PER_STRIP = 256
 def read_occurrence_rows(csv_path: Path) -> list[dict[str, str]]:
     with csv_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
         return list(csv.DictReader(csv_file))
-
-
-def scale_value(value: float, max_value: float, scale: str) -> float:
-    if max_value <= 0:
-        return 0
-    if scale == "linear":
-        return value / max_value
-    if scale == "log":
-        return math.log1p(value) / math.log1p(max_value)
-    raise ValueError(f"Unsupported scale: {scale}")
-
-
-def grayscale_color(value: float, max_value: float, scale: str) -> tuple[int, int, int]:
-    scaled = max(0, min(1, scale_value(value, max_value, scale)))
-    channel = round(scaled * 255)
-    return channel, channel, channel
-
-
-def interpolate_color(
-    start: tuple[int, int, int], end: tuple[int, int, int], amount: float
-) -> tuple[int, int, int]:
-    amount = max(0, min(1, amount))
-    return tuple(round(s + (e - s) * amount) for s, e in zip(start, end))
-
-
-def diverging_color(value: float, min_value: float, max_value: float) -> tuple[int, int, int]:
-    return signed_color(value, min_value, max_value, RED, BLUE)
-
-
-def magenta_white_green_color(
-    value: float, min_value: float, max_value: float
-) -> tuple[int, int, int]:
-    return signed_color(value, min_value, max_value, MAGENTA, GREEN)
-
-
-def signed_color(
-    value: float,
-    min_value: float,
-    max_value: float,
-    negative_color: tuple[int, int, int],
-    positive_color: tuple[int, int, int],
-) -> tuple[int, int, int]:
-    if value == 0:
-        return WHITE
-    if value < 0:
-        if min_value >= 0:
-            return WHITE
-        scaled = min(abs(value) / abs(min_value), 1)
-        return interpolate_color(WHITE, negative_color, scaled)
-    if max_value <= 0:
-        return WHITE
-    scaled = min(value / max_value, 1)
-    return interpolate_color(WHITE, positive_color, scaled)
-
-
-def metric_palette(metric: str) -> str:
-    metric = resolve_metric_name(metric)
-    if metric in MAGENTA_WHITE_GREEN_METRICS:
-        return "magenta-white-green"
-    if metric in DIVERGING_METRICS:
-        return "red-white-blue"
-    return "black-white"
 
 
 def metric_zero_color(metric: str) -> str:
@@ -135,70 +50,6 @@ def metric_positive_color(metric: str) -> str:
     if metric in MAGENTA_WHITE_GREEN_METRICS:
         return "green"
     return "blue" if metric in DIVERGING_METRICS else "white"
-
-
-def row_float(row: dict[str, str], column: str) -> float | None:
-    raw_value = row.get(column, "")
-    if raw_value == "":
-        return None
-    return float(raw_value)
-
-
-def ngram_the_frequency(rows: list[dict[str, str]], metric: str = "fic_ngram_total_freq") -> float:
-    candidates = metric_column_candidates(metric)
-    for row in rows:
-        if row.get("normalized_word", "").lower() == "the":
-            for candidate in candidates:
-                value = row_float(row, candidate)
-                if value is not None:
-                    return value
-    raise ValueError(
-        f"Cannot render {metric}: the CSV has no {metric} value for normalized_word 'the'. "
-        "Regenerate the occurrence CSV with the matching Ngram frequency file that includes 'the'."
-    )
-
-
-def metric_values(
-    rows: list[dict[str, str]],
-    metric: str,
-    class_discrimination: bool = True,
-) -> list[float]:
-    metric = resolve_metric_name(metric)
-    return row_metric_values(rows, metric, class_discrimination)
-
-
-def metric_color_maxima(
-    rows: list[dict[str, str]],
-    values: list[float],
-    metric: str,
-    max_value: float,
-    class_discrimination: bool,
-) -> list[float]:
-    metric = resolve_metric_name(metric)
-    if metric != BOOK_FREQ or not class_discrimination:
-        return [max_value] * len(values)
-
-    max_by_class: dict[str, float] = {}
-    for row, value in zip(rows, values):
-        word_class = row.get("word_class", "")
-        max_by_class[word_class] = max(value, max_by_class.get(word_class, 0))
-    return [max_by_class.get(row.get("word_class", ""), max_value) for row in rows]
-
-
-def metric_color(
-    value: float,
-    metric: str,
-    scale: str,
-    min_value: float,
-    max_value: float,
-    max_abs_value: float,
-) -> tuple[int, int, int]:
-    metric = resolve_metric_name(metric)
-    if metric in MAGENTA_WHITE_GREEN_METRICS:
-        return magenta_white_green_color(value, min_value, max_value)
-    if metric in DIVERGING_METRICS:
-        return diverging_color(value, min_value, max_value)
-    return grayscale_color(value, max_value, scale)
 
 
 def pack_bigtiff_value(field_type: int, values: list[int] | bytes, data_offset: int) -> bytes:
@@ -345,18 +196,10 @@ def render_frequency_map(
     rows = read_occurrence_rows(input_csv)
     values = metric_values(rows, metric, class_discrimination=class_discrimination)
     height = len(values)
-    max_value = (
-        ngram_the_frequency(rows, metric)
-        if is_ngram_frequency_metric(metric)
-        else max(values) if values else 0
-    )
-    min_value = min(values) if values else 0
-    max_abs_value = max((abs(value) for value in values), default=0)
-    row_max_values = metric_color_maxima(
+    color_scale = metric_color_scale(
         rows,
         values,
         metric,
-        max_value,
         class_discrimination,
     )
 
@@ -365,13 +208,13 @@ def render_frequency_map(
         save_bigtiff_line_map(
             output_png,
             values,
-            row_max_values,
+            color_scale.row_max_values,
             width,
             metric,
             scale,
-            min_value,
-            max_value,
-            max_abs_value,
+            color_scale.min_value,
+            color_scale.max_value,
+            color_scale.max_abs_value,
         )
     else:
         image = Image.new("RGB", (width, height), (0, 0, 0))
@@ -383,9 +226,9 @@ def render_frequency_map(
                     value,
                     metric,
                     scale,
-                    min_value,
-                    row_max_values[y],
-                    max_abs_value,
+                    color_scale.min_value,
+                    color_scale.row_max_values[y],
+                    color_scale.max_abs_value,
                 ),
             )
         image.save(output_png)
@@ -404,12 +247,14 @@ def render_frequency_map(
         "zero_color": metric_zero_color(metric),
         "negative_color": metric_negative_color(metric),
         "positive_color": metric_positive_color(metric),
-        "min_value": min_value,
-        "max_value": max_value,
-        "max_abs_value": max_abs_value,
-        "ngram_scale_top_word": "the" if is_ngram_frequency_metric(metric) else "",
-        "negative_scale_min": min_value if min_value < 0 else 0,
-        "positive_scale_max": max_value if max_value > 0 else 0,
+        "min_value": color_scale.min_value,
+        "max_value": color_scale.max_value,
+        "max_abs_value": color_scale.max_abs_value,
+        "frequency_scale_reference": (
+            color_scale.reference if metric in BLACK_WHITE_METRICS else ""
+        ),
+        "negative_scale_min": color_scale.min_value if color_scale.min_value < 0 else 0,
+        "positive_scale_max": color_scale.max_value if color_scale.max_value > 0 else 0,
     }
     output_png.with_suffix(".json").write_text(
         json.dumps(metadata, indent=2), encoding="utf-8"

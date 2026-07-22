@@ -1,0 +1,15 @@
+# Ngram_Stats
+
+These parameters are calculated separately for functional and semantic words.
+
+[functional]
+fic_ngrams_total_freq_avg=0.00725939250608
+fic_ngrams_total_freq_med=0.00359487317889
+fic_ngram_99_19_freq_avg=0.00730990270878
+fic_ngrams_99_19_freq_med=0.00352087650122
+
+[semantic]
+fic_ngrams_total_freq_avg=0.00015105738665
+fic_ngrams_total_freq_med=2.93755565636e-05
+fic_ngram_99_19_freq_avg=0.000153191638372
+fic_ngrams_99_19_freq_med=2.5122466304e-05

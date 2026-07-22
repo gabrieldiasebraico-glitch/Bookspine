@@ -53,7 +53,7 @@ class PlotVisualMapTests(unittest.TestCase):
 
         shutil.rmtree(temp_path, ignore_errors=True)
 
-    def test_renders_ngram_column_scaled_to_the_frequency(self):
+    def test_renders_ngram_column_scaled_to_each_word_class_maximum(self):
         temp_path = Path("output") / "test_plot_visual_map_ngram"
         shutil.rmtree(temp_path, ignore_errors=True)
         temp_path.mkdir(parents=True)
@@ -63,14 +63,36 @@ class PlotVisualMapTests(unittest.TestCase):
         with input_csv.open("w", encoding="utf-8", newline="") as csv_file:
             writer = csv.DictWriter(
                 csv_file,
-                fieldnames=["normalized_word", "fic_ngram_total_freq"],
+                fieldnames=["normalized_word", "word_class", "fic_ngram_total_freq"],
             )
             writer.writeheader()
             writer.writerows(
                 [
-                    {"normalized_word": "unknown", "fic_ngram_total_freq": ""},
-                    {"normalized_word": "house", "fic_ngram_total_freq": "0.25"},
-                    {"normalized_word": "the", "fic_ngram_total_freq": "0.5"},
+                    {
+                        "normalized_word": "unknown",
+                        "word_class": "semantic",
+                        "fic_ngram_total_freq": "",
+                    },
+                    {
+                        "normalized_word": "house",
+                        "word_class": "semantic",
+                        "fic_ngram_total_freq": "0.25",
+                    },
+                    {
+                        "normalized_word": "theory",
+                        "word_class": "semantic",
+                        "fic_ngram_total_freq": "0.5",
+                    },
+                    {
+                        "normalized_word": "the",
+                        "word_class": "functional",
+                        "fic_ngram_total_freq": "0.8",
+                    },
+                    {
+                        "normalized_word": "and",
+                        "word_class": "functional",
+                        "fic_ngram_total_freq": "0.4",
+                    },
                 ]
             )
 
@@ -83,14 +105,66 @@ class PlotVisualMapTests(unittest.TestCase):
         )
 
         self.assertEqual(metadata["palette"], "black-white")
-        self.assertEqual(metadata["max_value"], 0.5)
-        self.assertEqual(metadata["ngram_scale_top_word"], "the")
+        self.assertEqual(metadata["max_value"], 0.8)
+        self.assertEqual(metadata["frequency_scale_reference"], "word_class_maximum")
 
         with Image.open(output_png) as image:
-            self.assertEqual(image.size, (20, 3))
+            self.assertEqual(image.size, (20, 5))
             self.assertEqual(image.getpixel((0, 0)), (0, 0, 0))
             self.assertEqual(image.getpixel((0, 1)), (128, 128, 128))
             self.assertEqual(image.getpixel((0, 2)), (255, 255, 255))
+            self.assertEqual(image.getpixel((0, 3)), (255, 255, 255))
+            self.assertEqual(image.getpixel((0, 4)), (128, 128, 128))
+
+        shutil.rmtree(temp_path, ignore_errors=True)
+
+    def test_renders_ngram_column_scaled_to_global_maximum_without_classes(self):
+        temp_path = Path("output") / "test_plot_visual_map_ngram_global"
+        shutil.rmtree(temp_path, ignore_errors=True)
+        temp_path.mkdir(parents=True)
+        input_csv = temp_path / "occurrences.csv"
+        output_png = temp_path / "ngram.png"
+
+        with input_csv.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(
+                csv_file,
+                fieldnames=["normalized_word", "word_class", "fic_ngram_total_freq"],
+            )
+            writer.writeheader()
+            writer.writerows(
+                [
+                    {
+                        "normalized_word": "theory",
+                        "word_class": "semantic",
+                        "fic_ngram_total_freq": "0.5",
+                    },
+                    {
+                        "normalized_word": "the",
+                        "word_class": "functional",
+                        "fic_ngram_total_freq": "0.8",
+                    },
+                    {
+                        "normalized_word": "and",
+                        "word_class": "functional",
+                        "fic_ngram_total_freq": "0.4",
+                    },
+                ]
+            )
+
+        metadata = render_frequency_map(
+            input_csv,
+            output_png,
+            width=20,
+            scale="linear",
+            metric="fic_ngram_total_freq",
+            class_discrimination=False,
+        )
+
+        self.assertEqual(metadata["frequency_scale_reference"], "global_maximum")
+        with Image.open(output_png) as image:
+            self.assertEqual(image.getpixel((0, 0)), (159, 159, 159))
+            self.assertEqual(image.getpixel((0, 1)), (255, 255, 255))
+            self.assertEqual(image.getpixel((0, 2)), (128, 128, 128))
 
         shutil.rmtree(temp_path, ignore_errors=True)
         temp_path.mkdir(parents=True)

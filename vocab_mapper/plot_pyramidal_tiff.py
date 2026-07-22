@@ -10,18 +10,16 @@ import tifffile
 
 from vocab_mapper.metrics import (
     BOOK_FREQ,
-    is_ngram_frequency_metric,
     metric_definition,
     resolve_metric_name,
 )
-from vocab_mapper.plot_visual_map import (
+from vocab_mapper.plot_visual_map import read_occurrence_rows
+from vocab_mapper.viewer_rendering import (
     BLACK_WHITE_METRICS,
-    metric_color_maxima,
     metric_color,
+    metric_color_scale,
     metric_palette,
     metric_values,
-    ngram_the_frequency,
-    read_occurrence_rows,
 )
 
 
@@ -179,28 +177,20 @@ def render_pyramidal_map(
     metric = resolve_metric_name(metric)
     rows = read_occurrence_rows(input_csv)
     values = metric_values(rows, metric, class_discrimination=class_discrimination)
-    max_value = (
-        ngram_the_frequency(rows, metric)
-        if is_ngram_frequency_metric(metric)
-        else max(values) if values else 0
-    )
-    min_value = min(values) if values else 0
-    max_abs_value = max((abs(value) for value in values), default=0)
-    row_max_values = metric_color_maxima(
+    color_scale = metric_color_scale(
         rows,
         values,
         metric,
-        max_value,
         class_discrimination,
     )
     row_colors = values_to_colors(
         values,
-        row_max_values,
+        color_scale.row_max_values,
         metric,
         scale,
-        min_value,
-        max_value,
-        max_abs_value,
+        color_scale.min_value,
+        color_scale.max_value,
+        color_scale.max_abs_value,
     )
 
     metadata: dict[str, float | int | str | list[int]] = {
@@ -213,9 +203,12 @@ def render_pyramidal_map(
         "palette": metric_palette(metric),
         "display_width_px": width,
         "data_rows": len(values),
-        "min_value": min_value,
-        "max_value": max_value,
-        "max_abs_value": max_abs_value,
+        "min_value": color_scale.min_value,
+        "max_value": color_scale.max_value,
+        "max_abs_value": color_scale.max_abs_value,
+        "frequency_scale_reference": (
+            color_scale.reference if metric in BLACK_WHITE_METRICS else ""
+        ),
         "horizontal_pixels_are_display_magnification": "true",
     }
     metadata.update(write_pyramidal_tiff(output_tiff, row_colors, width, metric, scale, compression))

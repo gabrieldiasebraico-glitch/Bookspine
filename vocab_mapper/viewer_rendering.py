@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
 
 from vocab_mapper.metric_values import row_metric_values
 from vocab_mapper.metrics import (
-    BOOK_FREQ,
     METRIC_SPECS,
     is_ngram_frequency_metric,
     resolve_metric_name,
@@ -27,6 +27,15 @@ DIVERGING_METRICS = {
     for spec in METRIC_SPECS
     if spec.palette in {"red-white-blue", "magenta-white-green"}
 }
+
+
+@dataclass(frozen=True)
+class MetricColorScale:
+    min_value: float
+    max_value: float
+    max_abs_value: float
+    row_max_values: list[float]
+    reference: str
 
 
 def scale_value(value: float, max_value: float, scale: str) -> float:
@@ -104,22 +113,43 @@ def metric_values(
     return row_metric_values(rows, metric, class_discrimination)
 
 
-def metric_color_maxima(
+def metric_color_scale(
     rows: list[dict[str, str]],
     values: list[float],
     metric: str,
-    max_value: float,
     class_discrimination: bool,
-) -> list[float]:
+) -> MetricColorScale:
     metric = resolve_metric_name(metric)
-    if metric != BOOK_FREQ or not class_discrimination:
-        return [max_value] * len(values)
+    min_value = min(values) if values else 0
+    max_value = max(values) if values else 0
+    max_abs_value = max((abs(value) for value in values), default=0)
+    row_max_values = [max_value] * len(values)
+    reference = "global_maximum"
+
+    if not class_discrimination or metric not in BLACK_WHITE_METRICS:
+        return MetricColorScale(
+            min_value=min_value,
+            max_value=max_value,
+            max_abs_value=max_abs_value,
+            row_max_values=row_max_values,
+            reference=reference,
+        )
 
     max_by_class: dict[str, float] = {}
     for row, value in zip(rows, values):
         word_class = row.get("word_class", "")
         max_by_class[word_class] = max(value, max_by_class.get(word_class, 0))
-    return [max_by_class.get(row.get("word_class", ""), max_value) for row in rows]
+    row_max_values = [
+        max_by_class.get(row.get("word_class", ""), max_value)
+        for row in rows
+    ]
+    return MetricColorScale(
+        min_value=min_value,
+        max_value=max_value,
+        max_abs_value=max_abs_value,
+        row_max_values=row_max_values,
+        reference="word_class_maximum",
+    )
 
 
 def metric_color(

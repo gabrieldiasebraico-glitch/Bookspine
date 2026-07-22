@@ -1,0 +1,587 @@
+{
+  "the_mysteries_of_udolpho": {
+    "title": "The Mysteries of Udolpho",
+    "author": "Ann Radcliffe",
+    "publication_year": "1794"
+  },
+  "castle_rackrent": {
+    "title": "Castle Rackrent",
+    "author": "Maria Edgeworth",
+    "publication_year": "1800"
+  },
+  "the_wild_irish_girl": {
+    "title": "The Wild Irish Girl",
+    "author": "Sydney Owenson",
+    "publication_year": "1806"
+  },
+  "pride_and_prejudice": {
+    "title": "Pride and Prejudice",
+    "author": "Jane Austen",
+    "publication_year": "1813"
+  },
+  "frankenstein": {
+    "title": "Frankenstein",
+    "author": "Mary Shelley",
+    "publication_year": "1818"
+  },
+  "the_last_days_of_pompeii": {
+    "title": "The Last Days of Pompeii",
+    "author": "Edward Bulwer-Lytton",
+    "publication_year": "1834"
+  },
+  "nick_of_the_woods": {
+    "title": "Nick of the Woods",
+    "author": "Robert Montgomery Bird",
+    "publication_year": "1837"
+  },
+  "oliver_twist": {
+    "title": "Oliver Twist",
+    "author": "Charles Dickens",
+    "publication_year": "1837–1839"
+  },
+  "the_narrative_of_arthur_gordon_pym_of_nantucket": {
+    "title": "The Narrative of Arthur Gordon Pym of Nantucket",
+    "author": "Edgar Allan Poe",
+    "publication_year": "1838"
+  },
+  "the_fall_of_the_house_of_usher": {
+    "title": "The Fall of the House of Usher",
+    "author": "Edgar Allan Poe",
+    "publication_year": "1839"
+  },
+  "jane_eyre": {
+    "title": "Jane Eyre",
+    "author": "Charlotte Brontë",
+    "publication_year": "1847"
+  },
+  "wuthering_heights": {
+    "title": "Wuthering Heights",
+    "author": "Emily Brontë",
+    "publication_year": "1847"
+  },
+  "the_wide_wide_world": {
+    "title": "The Wide, Wide World",
+    "author": "Susan Warner",
+    "publication_year": "1850"
+  },
+  "moby_dick": {
+    "title": "Moby-Dick",
+    "author": "Herman Melville",
+    "publication_year": "1851"
+  },
+  "the_lamplighter": {
+    "title": "The Lamplighter",
+    "author": "Maria Susanna Cummins",
+    "publication_year": "1854"
+  },
+  "great_expectations": {
+    "title": "Great Expectations",
+    "author": "Charles Dickens",
+    "publication_year": "1860–1861"
+  },
+  "alice_s_adventures_in_wonderland": {
+    "title": "Alice's Adventures in Wonderland",
+    "author": "Lewis Carroll",
+    "publication_year": "1865"
+  },
+  "st_elmo": {
+    "title": "St. Elmo",
+    "author": "Augusta Jane Evans",
+    "publication_year": "1866"
+  },
+  "carmilla": {
+    "title": "Carmilla",
+    "author": "Sheridan Le Fanu",
+    "publication_year": "1872"
+  },
+  "the_princess_and_the_goblin": {
+    "title": "The Princess and the Goblin",
+    "author": "George MacDonald",
+    "publication_year": "1872"
+  },
+  "the_way_we_live_now": {
+    "title": "The Way We Live Now",
+    "author": "Anthony Trollope",
+    "publication_year": "1875"
+  },
+  "the_leavenworth_case": {
+    "title": "The Leavenworth Case",
+    "author": "Anna Katharine Green",
+    "publication_year": "1878"
+  },
+  "ben_hur_a_tale_of_the_christ": {
+    "title": "Ben-Hur: A Tale of the Christ",
+    "author": "Lew Wallace",
+    "publication_year": "1880"
+  },
+  "looking_backward": {
+    "title": "Looking Backward",
+    "author": "Edward Bellamy",
+    "publication_year": "1888"
+  },
+  "the_picture_of_dorian_gray": {
+    "title": "The Picture of Dorian Gray",
+    "author": "Oscar Wilde",
+    "publication_year": "1890"
+  },
+  "trilby": {
+    "title": "Trilby",
+    "author": "George du Maurier",
+    "publication_year": "1894"
+  },
+  "dracula": {
+    "title": "Dracula",
+    "author": "Bram Stoker",
+    "publication_year": "1897"
+  },
+  "the_wonderful_wizard_of_oz": {
+    "title": "The Wonderful Wizard of Oz",
+    "author": "L. Frank Baum",
+    "publication_year": "1900"
+  },
+  "the_call_of_the_wild": {
+    "title": "The Call of the Wild",
+    "author": "Jack London",
+    "publication_year": "1903"
+  },
+  "the_wind_in_the_willows": {
+    "title": "The Wind in the Willows",
+    "author": "Kenneth Grahame",
+    "publication_year": "1908"
+  },
+  "the_house_on_the_borderland": {
+    "title": "The House on the Borderland",
+    "author": "William Hope Hodgson",
+    "publication_year": "1908"
+  },
+  "peter_pan": {
+    "title": "Peter Pan",
+    "author": "J. M. Barrie",
+    "publication_year": "1911"
+  },
+  "the_secret_garden": {
+    "title": "The Secret Garden",
+    "author": "Frances Hodgson Burnett",
+    "publication_year": "1911"
+  },
+  "tarzan_of_the_apes": {
+    "title": "Tarzan of the Apes",
+    "author": "Edgar Rice Burroughs",
+    "publication_year": "1912"
+  },
+  "herland": {
+    "title": "Herland",
+    "author": "Charlotte Perkins Gilman",
+    "publication_year": "1915"
+  },
+  "the_sheik": {
+    "title": "The Sheik",
+    "author": "E. M. Hull",
+    "publication_year": "1919"
+  },
+  "main_street": {
+    "title": "Main Street",
+    "author": "Sinclair Lewis",
+    "publication_year": "1920"
+  },
+  "gentlemen_prefer_blondes": {
+    "title": "Gentlemen Prefer Blondes",
+    "author": "Anita Loos",
+    "publication_year": "1925"
+  },
+  "lud_in_the_mist": {
+    "title": "Lud-in-the-Mist",
+    "author": "Hope Mirrlees",
+    "publication_year": "1926"
+  },
+  "the_maltese_falcon": {
+    "title": "The Maltese Falcon",
+    "author": "Dashiell Hammett",
+    "publication_year": "1930"
+  },
+  "murder_on_the_orient_express": {
+    "title": "Murder on the Orient Express",
+    "author": "Agatha Christie",
+    "publication_year": "1934"
+  },
+  "gone_with_the_wind": {
+    "title": "Gone with the Wind",
+    "author": "Margaret Mitchell",
+    "publication_year": "1936"
+  },
+  "of_mice_and_men": {
+    "title": "Of Mice and Men",
+    "author": "John Steinbeck",
+    "publication_year": "1937"
+  },
+  "rebecca": {
+    "title": "Rebecca",
+    "author": "Daphne du Maurier",
+    "publication_year": "1938"
+  },
+  "the_sword_in_the_stone": {
+    "title": "The Sword in the Stone",
+    "author": "T. H. White",
+    "publication_year": "1938"
+  },
+  "and_then_there_were_none": {
+    "title": "And Then There Were None",
+    "author": "Agatha Christie",
+    "publication_year": "1939"
+  },
+  "finnegans_wake": {
+    "title": "Finnegans Wake",
+    "author": "James Joyce",
+    "publication_year": "1939"
+  },
+  "the_big_sleep": {
+    "title": "The Big Sleep",
+    "author": "Raymond Chandler",
+    "publication_year": "1939"
+  },
+  "forever_amber": {
+    "title": "Forever Amber",
+    "author": "Kathleen Winsor",
+    "publication_year": "1944"
+  },
+  "the_gormenghast_trilogy": {
+    "title": "The Gormenghast Trilogy",
+    "author": "Mervyn Peake",
+    "publication_year": "1946–1959"
+  },
+  "1984": {
+    "title": "1984",
+    "author": "George Orwell",
+    "publication_year": "1949"
+  },
+  "the_old_man_and_the_sea": {
+    "title": "The Old Man and the Sea",
+    "author": "Ernest Hemingway",
+    "publication_year": "1952"
+  },
+  "the_lord_of_the_rings": {
+    "title": "The Lord of the Rings",
+    "author": "J. R. R. Tolkien",
+    "publication_year": "1954–1955"
+  },
+  "lord_of_the_rings": {
+    "title": "The Lord of the Rings",
+    "author": "J. R. R. Tolkien",
+    "publication_year": "1954–1955"
+  },
+  "peyton_place": {
+    "title": "Peyton Place",
+    "author": "Grace Metalious",
+    "publication_year": "1956"
+  },
+  "to_kill_a_mockingbird": {
+    "title": "To Kill a Mockingbird",
+    "author": "Harper Lee",
+    "publication_year": "1960"
+  },
+  "a_wrinkle_in_time": {
+    "title": "A Wrinkle in Time",
+    "author": "Madeleine L'Engle",
+    "publication_year": "1962"
+  },
+  "the_drowned_world": {
+    "title": "The Drowned World",
+    "author": "J. G. Ballard",
+    "publication_year": "1962"
+  },
+  "charlie_and_the_chocolate_factory": {
+    "title": "Charlie and the Chocolate Factory",
+    "author": "Roald Dahl",
+    "publication_year": "1964"
+  },
+  "dune": {
+    "title": "Dune",
+    "author": "Frank Hebert",
+    "publication_year": "1965"
+  },
+  "valley_of_the_dolls": {
+    "title": "Valley of the Dolls",
+    "author": "Jacqueline Susann",
+    "publication_year": "1966"
+  },
+  "the_last_unicorn": {
+    "title": "The Last Unicorn",
+    "author": "Peter S. Beagle",
+    "publication_year": "1968"
+  },
+  "slaughterhouse_five": {
+    "title": "Slaughterhouse-Five",
+    "author": "Kurt Vonnegut",
+    "publication_year": "1969"
+  },
+  "watership_down": {
+    "title": "Watership Down",
+    "author": "Richard Adams",
+    "publication_year": "1972"
+  },
+  "the_flame_and_the_flower": {
+    "title": "The Flame and the Flower",
+    "author": "Kathleen E. Woodiwiss",
+    "publication_year": "1972"
+  },
+  "gravity_s_rainbow": {
+    "title": "Gravity’s Rainbow",
+    "author": "Thomas Pynchon",
+    "publication_year": "1973"
+  },
+  "jaws": {
+    "title": "Jaws",
+    "author": "Peter Benchley",
+    "publication_year": "1974"
+  },
+  "sweet_savage_love": {
+    "title": "Sweet Savage Love",
+    "author": "Rosemary Rogers",
+    "publication_year": "1974"
+  },
+  "dhalgren": {
+    "title": "Dhalgren",
+    "author": "Samuel R. Delany",
+    "publication_year": "1975"
+  },
+  "flowers_in_the_attic": {
+    "title": "Flowers in the Attic",
+    "author": "V. C. Andrews",
+    "publication_year": "1979"
+  },
+  "little_big": {
+    "title": "Little, Big",
+    "author": "John Crowley",
+    "publication_year": "1981"
+  },
+  "neuromancer": {
+    "title": "Neuromancer",
+    "author": "William Gibson",
+    "publication_year": "1984"
+  },
+  "blood_meridian": {
+    "title": "Blood Meridian",
+    "author": "Cormac MCarthy",
+    "publication_year": "1985"
+  },
+  "beloved": {
+    "title": "Beloved",
+    "author": "Toni Morrison",
+    "publication_year": "1987"
+  },
+  "geek_love": {
+    "title": "Geek Love",
+    "author": "Katherine Dunn",
+    "publication_year": "1989"
+  },
+  "snow_crash": {
+    "title": "Snow Crash",
+    "author": "Neal Stephenson",
+    "publication_year": "1992"
+  },
+  "the_bridges_of_madison_county": {
+    "title": "The Bridges of Madison County",
+    "author": "Robert James Waller",
+    "publication_year": "1992"
+  },
+  "a_game_of_thrones_a_song_of_ice_and_fire": {
+    "title": "A Game of Thrones/ A Song of Ice and Fire",
+    "author": "George R. R. Martin",
+    "publication_year": "1996"
+  },
+  "infinite_jest": {
+    "title": "Infinite Jest",
+    "author": "David Foster Wallace",
+    "publication_year": "1996"
+  },
+  "the_notebook": {
+    "title": "The Notebook",
+    "author": "Nicholas Sparks",
+    "publication_year": "1996"
+  },
+  "harry_potter_and_the_philosophers_stone_by_jk_rowling": {
+    "title": "Harry Potter",
+    "author": "J.K. Rowling",
+    "publication_year": "1997–2007"
+  },
+  "harry_potter_and_the_sorcerers_stone": {
+    "title": "Harry Potter",
+    "author": "J.K. Rowling",
+    "publication_year": "1997–2007"
+  },
+  "harry_potter_and_the_philosophers_stone": {
+    "title": "Harry Potter",
+    "author": "J.K. Rowling",
+    "publication_year": "1997–2007"
+  },
+  "harry_potter": {
+    "title": "Harry Potter",
+    "author": "J.K. Rowling",
+    "publication_year": "1997–2007"
+  },
+  "perdido_street_station": {
+    "title": "Perdido Street Station",
+    "author": "China Miéville",
+    "publication_year": "2000"
+  },
+  "eragon": {
+    "title": "Eragon",
+    "author": "Christopher Paolini",
+    "publication_year": "2002"
+  },
+  "the_da_vinci_code": {
+    "title": "The Da Vinci Code",
+    "author": "Dan Brown",
+    "publication_year": "2003"
+  },
+  "twilight": {
+    "title": "Twilight",
+    "author": "Stephenie Meyer",
+    "publication_year": "2005–2020"
+  },
+  "the_road": {
+    "title": "The Road",
+    "author": "Cormac MCarthy",
+    "publication_year": "2006"
+  },
+  "the_name_of_the_wind": {
+    "title": "The Name of the Wind",
+    "author": "Patrick Rothfuss",
+    "publication_year": "2007"
+  },
+  "the_hunger_games": {
+    "title": "The Hunger Games",
+    "author": "Suzanne Collins",
+    "publication_year": "2008–2025"
+  },
+  "divergent": {
+    "title": "Divergent",
+    "author": "Veronica Roth",
+    "publication_year": "2011"
+  },
+  "fifty_shades_of_grey": {
+    "title": "Fifty Shades of Grey",
+    "author": "E. L. James",
+    "publication_year": "2011"
+  },
+  "the_song_of_achilles": {
+    "title": "The Song of Achilles",
+    "author": "Madeline Miller",
+    "publication_year": "2011"
+  },
+  "the_fault_in_our_stars": {
+    "title": "The Fault in Our Stars",
+    "author": "John Green",
+    "publication_year": "2012"
+  },
+  "after": {
+    "title": "After",
+    "author": "Anna Todd",
+    "publication_year": "2014"
+  },
+  "the_fifth_season": {
+    "title": "The Fifth Season",
+    "author": "N. K. Jemisin",
+    "publication_year": "2015"
+  },
+  "a_court_of_thorns_and_roses": {
+    "title": "A Court of Thorns and Roses",
+    "author": "Sarah J. Maas",
+    "publication_year": "2015"
+  },
+  "a_little_life": {
+    "title": "A Little Life",
+    "author": "Hanya Yanagihara",
+    "publication_year": "2015"
+  },
+  "it_ends_with_us": {
+    "title": "It Ends with Us",
+    "author": "Colleen Hoover",
+    "publication_year": "2016"
+  },
+  "the_seven_husbands_of_evelyn_hugo": {
+    "title": "The Seven Husbands of Evelyn Hugo",
+    "author": "Taylor Jenkins Reid",
+    "publication_year": "2017"
+  },
+  "they_both_die_at_the_end": {
+    "title": "They Both Die at the End",
+    "author": "Adam Silvera",
+    "publication_year": "2017"
+  },
+  "the_cruel_prince": {
+    "title": "The Cruel Prince",
+    "author": "Holly Black",
+    "publication_year": "2018"
+  },
+  "verity": {
+    "title": "Verity",
+    "author": "Colleen Hoover",
+    "publication_year": "2018"
+  },
+  "sabrina": {
+    "title": "Sabrina",
+    "author": "Nick Drnaso",
+    "publication_year": "2018"
+  },
+  "red_white_royal_blue": {
+    "title": "Red, White & Royal Blue",
+    "author": "Casey McQuiston",
+    "publication_year": "2019"
+  },
+  "bunny": {
+    "title": "Bunny",
+    "author": "Mona Awad",
+    "publication_year": "2019"
+  },
+  "heated_rivalry_game_changers": {
+    "title": "Heated Rivalry",
+    "author": "Rachel Reid",
+    "publication_year": "2019"
+  },
+  "heated_rivalry": {
+    "title": "Heated Rivalry",
+    "author": "Rachel Reid",
+    "publication_year": "2019"
+  },
+  "the_invisible_life_of_addie_larue": {
+    "title": "The Invisible Life of Addie LaRue",
+    "author": "V. E. Schwab",
+    "publication_year": "2020"
+  },
+  "the_midnight_library": {
+    "title": "The Midnight Library",
+    "author": "Matt Haig",
+    "publication_year": "2020"
+  },
+  "the_atlas_six": {
+    "title": "The Atlas Six",
+    "author": "Olivie Blake",
+    "publication_year": "2020"
+  },
+  "the_love_hypothesis": {
+    "title": "The Love Hypothesis",
+    "author": "Ali Hazelwood",
+    "publication_year": "2021"
+  },
+  "fourth_wing": {
+    "title": "Fourth Wing",
+    "author": "Rebecca Yarros",
+    "publication_year": "2023"
+  },
+  "beowulf": {
+    "title": "Beowulf",
+    "author": "Unknown",
+    "publication_year": "700–1000"
+  },
+  "alices_adventures_in_wonderland": {
+    "title": "Alice's Adventures in Wonderland",
+    "author": "Lewis Carroll",
+    "publication_year": "1865"
+  },
+  "gravitys_rainbow": {
+    "title": "Gravity’s Rainbow",
+    "author": "Thomas Pynchon",
+    "publication_year": "1973"
+  }
+}

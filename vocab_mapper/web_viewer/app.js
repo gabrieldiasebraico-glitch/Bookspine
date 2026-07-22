@@ -37,6 +37,7 @@ const state = {
   summaryVisible: false,
   loading: false,
   loadingMaps: true,
+  loadError: "",
   abort: null,
   overviewAbort: null,
   summaryAbort: null,
@@ -160,9 +161,10 @@ function setStatus(text) {
 
 async function loadMaps(preferredMapId = "") {
   state.loadingMaps = true;
+  state.loadError = "";
   setStatus("Scanning maps...");
   const response = await fetch("/api/maps");
-  const payload = await response.json();
+  const payload = await readJsonResponse(response, "Map list unavailable.");
   state.maps = payload.maps || [];
   state.books = uniqueBooks(state.maps);
   state.loadingMaps = false;
@@ -248,13 +250,13 @@ async function fetchViewport() {
     const classDiscrimination = classDiscriminationInput.checked ? "1" : "0";
     const url = `/api/maps/${state.map.id}/viewport?start=${range.start}&end=${range.end}&limit=${limit}&classDiscrimination=${classDiscrimination}`;
     const response = await fetch(url, { signal: state.abort.signal });
-    state.data = await response.json();
+    state.data = await readJsonResponse(response, "Could not load viewport.");
     const shown = Math.max(0, range.end - range.start).toLocaleString();
     const total = state.map.totalRows.toLocaleString();
     setStatus(`${shown} of ${total} word rows`);
   } catch (error) {
     if (error.name !== "AbortError") {
-      setStatus("Could not load viewport.");
+      setStatus(error.message || "Could not load viewport.");
       console.error(error);
     }
   } finally {
@@ -273,9 +275,12 @@ async function fetchOverview() {
     const classDiscrimination = classDiscriminationInput.checked ? "1" : "0";
     const url = `/api/maps/${state.map.id}/viewport?start=0&end=${state.map.totalRows}&limit=${limit}&classDiscrimination=${classDiscrimination}`;
     const response = await fetch(url, { signal: state.overviewAbort.signal });
-    state.overview = await response.json();
+    state.overview = await readJsonResponse(response, "Could not load map overview.");
   } catch (error) {
-    if (error.name !== "AbortError") console.error(error);
+    if (error.name !== "AbortError") {
+      setStatus(error.message || "Could not load map overview.");
+      console.error(error);
+    }
   } finally {
     draw();
   }
@@ -290,11 +295,11 @@ async function fetchSummary() {
     const response = await fetch(`/api/maps/${state.map.id}/summary?classDiscrimination=${classDiscrimination}`, {
       signal: state.summaryAbort.signal,
     });
-    state.summary = await response.json();
+    state.summary = await readJsonResponse(response, "Could not load map information.");
     renderSummary();
   } catch (error) {
     if (error.name !== "AbortError") {
-      mapInfoEl.textContent = "Could not load map information.";
+      mapInfoEl.textContent = error.message || "Could not load map information.";
       console.error(error);
     }
   }
@@ -339,7 +344,11 @@ function draw() {
   drawResizeHandles(box);
 
   if (!state.map) {
-    drawEmpty(state.loadingMaps ? "Loading maps..." : "No maps found in output/maps.");
+    drawEmpty(
+      state.loadingMaps
+        ? "Loading maps..."
+        : state.loadError || "No maps found in output/maps.",
+    );
     return;
   }
 
@@ -852,4 +861,10 @@ window.addEventListener("resize", resizeCanvas);
 
 resizeCanvas();
 syncSummaryVisibility();
-loadMaps(new URLSearchParams(window.location.search).get("map") || "");
+loadMaps(new URLSearchParams(window.location.search).get("map") || "").catch((error) => {
+  state.loadingMaps = false;
+  state.loadError = error.message || "Map list unavailable.";
+  setStatus(state.loadError);
+  draw();
+  console.error(error);
+});
