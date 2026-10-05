@@ -131,6 +131,18 @@
               </select>
             </label>
             <label class="field stacked">
+              <span>Bandwidth</span>
+              <input id="kdeBandwidth" type="number" min="0" step="any" placeholder="Auto (Silverman)" title="Leave blank to estimate the bandwidth automatically">
+            </label>
+            <label class="field stacked">
+              <span>X Maximum</span>
+              <input id="kdeXMax" type="number" step="any" placeholder="Auto" title="Leave blank to use the largest plotted X value">
+            </label>
+            <label class="field stacked">
+              <span>Y Maximum</span>
+              <input id="kdeYMax" type="number" min="0" step="any" placeholder="Auto" title="Leave blank to use the largest density value">
+            </label>
+            <label class="field stacked">
               <span>Vertical Lines</span>
               <input id="kdeVerticalLines" type="number" min="0" max="20" value="6">
             </label>

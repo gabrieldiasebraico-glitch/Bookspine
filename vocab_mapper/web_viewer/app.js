@@ -12,6 +12,38 @@ const showStructureInput = document.getElementById("showStructure");
 const classDiscriminationInput = document.getElementById("classDiscrimination");
 const mapInfoEl = document.getElementById("mapInfo");
 const toggleSummaryButton = document.getElementById("toggleSummary");
+const smoothingMethodInput = document.getElementById("smoothingMethod");
+const smoothingConfigButton = document.getElementById("smoothingConfigButton");
+const smoothingSummaryEl = document.getElementById("smoothingSummary");
+const smoothingDialog = document.getElementById("smoothingDialog");
+const smoothingForm = document.getElementById("smoothingForm");
+const smoothingBandwidthInput = document.getElementById("smoothingBandwidth");
+const smoothingWindowInput = document.getElementById("smoothingWindow");
+const smoothingPolynomialInput = document.getElementById("smoothingPolynomial");
+const smoothingAlphaInput = document.getElementById("smoothingAlpha");
+const smoothingCutoffInput = document.getElementById("smoothingCutoff");
+const smoothingBoundaryInput = document.getElementById("smoothingBoundary");
+const smoothingDomainInput = document.getElementById("smoothingDomain");
+const smoothingAdaptiveStrengthInput = document.getElementById("smoothingAdaptiveStrength");
+const smoothingStructureInput = document.getElementById("smoothingStructure");
+const smoothingZoomAdaptiveInput = document.getElementById("smoothingZoomAdaptive");
+const smoothingBlurRadiusInput = document.getElementById("smoothingBlurRadius");
+const smoothingNoneMessage = document.getElementById("smoothingNoneMessage");
+
+const DEFAULT_SMOOTHING = Object.freeze({
+  method: "none",
+  bandwidth: 50,
+  window: 51,
+  polynomial: 3,
+  alpha: 0.2,
+  cutoff: 4,
+  boundary: "reflect",
+  domain: "normalized",
+  adaptiveStrength: 1,
+  structure: "paragraph",
+  zoomAdaptive: false,
+  blurRadius: 2,
+});
 
 const MIN_MAP_WIDTH = 280;
 const LEFT_PANEL_RATIO = 0.5;
@@ -31,6 +63,7 @@ const state = {
   zoom: 1,
   fontSize: 12,
   panelSize: 300,
+  smoothing: { ...DEFAULT_SMOOTHING },
   data: null,
   overview: null,
   summary: null,
@@ -159,6 +192,111 @@ function setStatus(text) {
   statusEl.textContent = text;
 }
 
+function smoothingMethodLabel(method = state.smoothing.method) {
+  const option = Array.from(smoothingMethodInput.options).find((item) => item.value === method);
+  return option ? option.textContent : method;
+}
+
+function smoothingSummary(config = state.smoothing) {
+  const zoom = config.zoomAdaptive ? ", adaptive zoom" : "";
+  if (config.method === "none") return "Unsmoothed";
+  if (config.method === "moving_average") return `${config.window}-word moving window${zoom}`;
+  if (config.method === "gaussian") return `Gaussian σ ${config.bandwidth} words${zoom}`;
+  if (config.method === "median") return `${config.window}-word median${zoom}`;
+  if (config.method === "savitzky_golay") return `Savitzky-Golay ${config.window}/${config.polynomial}${zoom}`;
+  if (config.method === "exponential") return `EMA α ${config.alpha}${zoom}`;
+  if (config.method === "adaptive_gaussian") return `Adaptive Gaussian σ ${config.bandwidth}${zoom}`;
+  if (config.method === "structure_gaussian") return `${config.structure} Gaussian σ ${config.bandwidth}${zoom}`;
+  if (config.method === "display_blur") return `Visual blur ${config.blurRadius}px`;
+  return smoothingMethodLabel(config.method);
+}
+
+function syncSmoothingSummary() {
+  smoothingMethodInput.value = state.smoothing.method;
+  smoothingSummaryEl.value = smoothingSummary();
+  smoothingSummaryEl.textContent = smoothingSummary();
+  smoothingSummaryEl.title = `${smoothingMethodLabel()}: ${smoothingSummary()}`;
+}
+
+function syncSmoothingForm(config = state.smoothing) {
+  smoothingBandwidthInput.value = String(config.bandwidth);
+  smoothingWindowInput.value = String(config.window);
+  smoothingPolynomialInput.value = String(config.polynomial);
+  smoothingAlphaInput.value = String(config.alpha);
+  smoothingCutoffInput.value = String(config.cutoff);
+  smoothingBoundaryInput.value = config.boundary;
+  smoothingDomainInput.value = config.domain;
+  smoothingAdaptiveStrengthInput.value = String(config.adaptiveStrength);
+  smoothingStructureInput.value = config.structure;
+  smoothingZoomAdaptiveInput.checked = config.zoomAdaptive;
+  smoothingBlurRadiusInput.value = String(config.blurRadius);
+  syncSmoothingFieldVisibility();
+}
+
+function syncSmoothingFieldVisibility() {
+  const method = smoothingMethodInput.value;
+  for (const field of smoothingDialog.querySelectorAll("[data-methods]")) {
+    const methods = String(field.dataset.methods || "").split(/\s+/);
+    field.classList.toggle("hidden", !methods.includes(method));
+  }
+  smoothingNoneMessage.classList.toggle("hidden", method !== "none");
+}
+
+function smoothingNumber(input, fallback) {
+  const value = Number(input.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function readSmoothingForm() {
+  let windowSize = Math.max(3, Math.min(501, Math.round(smoothingNumber(smoothingWindowInput, 51))));
+  if (windowSize % 2 === 0) windowSize += windowSize < 501 ? 1 : -1;
+  const polynomial = Math.max(1, Math.min(9, windowSize - 1, Math.round(smoothingNumber(smoothingPolynomialInput, 3))));
+  return {
+    method: smoothingMethodInput.value,
+    bandwidth: Math.max(0.1, Math.min(5000, smoothingNumber(smoothingBandwidthInput, 50))),
+    window: windowSize,
+    polynomial,
+    alpha: Math.max(0.001, Math.min(1, smoothingNumber(smoothingAlphaInput, 0.2))),
+    cutoff: Math.max(1, Math.min(6, smoothingNumber(smoothingCutoffInput, 4))),
+    boundary: smoothingBoundaryInput.value,
+    domain: smoothingDomainInput.value,
+    adaptiveStrength: Math.max(0.1, Math.min(10, smoothingNumber(smoothingAdaptiveStrengthInput, 1))),
+    structure: smoothingStructureInput.value,
+    zoomAdaptive: smoothingZoomAdaptiveInput.checked,
+    blurRadius: Math.max(0.25, Math.min(20, smoothingNumber(smoothingBlurRadiusInput, 2))),
+  };
+}
+
+function invalidateSmoothedMap() {
+  state.data = null;
+  state.overview = null;
+  scheduleOverviewFetch();
+  scheduleFetch();
+}
+
+function viewportParams(start, end, limit, pixelsPerOccurrence) {
+  const config = state.smoothing;
+  const params = new URLSearchParams({
+    start: String(start),
+    end: String(end),
+    limit: String(limit),
+    classDiscrimination: classDiscriminationInput.checked ? "1" : "0",
+    pixelsPerOccurrence: String(pixelsPerOccurrence),
+    smoothingMethod: config.method === "display_blur" ? "none" : config.method,
+    smoothingBandwidth: String(config.bandwidth),
+    smoothingWindow: String(config.window),
+    smoothingPolynomial: String(config.polynomial),
+    smoothingAlpha: String(config.alpha),
+    smoothingCutoff: String(config.cutoff),
+    smoothingBoundary: config.boundary,
+    smoothingDomain: config.domain,
+    smoothingAdaptiveStrength: String(config.adaptiveStrength),
+    smoothingStructure: config.structure,
+    smoothingZoomAdaptive: config.zoomAdaptive ? "1" : "0",
+  });
+  return params;
+}
+
 async function loadMaps(preferredMapId = "") {
   state.loadingMaps = true;
   state.loadError = "";
@@ -247,8 +385,8 @@ async function fetchViewport() {
   state.abort = new AbortController();
   state.loading = true;
   try {
-    const classDiscrimination = classDiscriminationInput.checked ? "1" : "0";
-    const url = `/api/maps/${state.map.id}/viewport?start=${range.start}&end=${range.end}&limit=${limit}&classDiscrimination=${classDiscrimination}`;
+    const params = viewportParams(range.start, range.end, limit, state.zoom);
+    const url = `/api/maps/${state.map.id}/viewport?${params}`;
     const response = await fetch(url, { signal: state.abort.signal });
     state.data = await readJsonResponse(response, "Could not load viewport.");
     const shown = Math.max(0, range.end - range.start).toLocaleString();
@@ -272,8 +410,9 @@ async function fetchOverview() {
   if (state.overviewAbort) state.overviewAbort.abort();
   state.overviewAbort = new AbortController();
   try {
-    const classDiscrimination = classDiscriminationInput.checked ? "1" : "0";
-    const url = `/api/maps/${state.map.id}/viewport?start=0&end=${state.map.totalRows}&limit=${limit}&classDiscrimination=${classDiscrimination}`;
+    const overviewZoom = box.height / Math.max(1, state.map.totalRows);
+    const params = viewportParams(0, state.map.totalRows, limit, overviewZoom);
+    const url = `/api/maps/${state.map.id}/viewport?${params}`;
     const response = await fetch(url, { signal: state.overviewAbort.signal });
     state.overview = await readJsonResponse(response, "Could not load map overview.");
   } catch (error) {
@@ -413,6 +552,10 @@ function drawEmpty(text) {
 }
 
 function drawSamples(box) {
+  if (state.smoothing.method === "display_blur" && state.smoothing.blurRadius > 0) {
+    drawBlurredSamples(box);
+    return;
+  }
   for (const sample of state.data.samples) {
     const y0 = yFor(sample.start);
     const y1 = yFor(sample.end);
@@ -420,6 +563,34 @@ function drawSamples(box) {
     ctx.fillStyle = sample.color;
     ctx.fillRect(box.mapLeft, Math.floor(y0), box.mapWidth, Math.max(1, Math.ceil(y1 - y0)));
   }
+}
+
+function drawBlurredSamples(box) {
+  const radius = state.smoothing.blurRadius;
+  const padding = Math.ceil(radius * 3);
+  const width = Math.max(1, Math.ceil(box.mapWidth + padding * 2));
+  const height = Math.max(1, Math.ceil(box.height + padding * 2));
+  const offscreen = document.createElement("canvas");
+  offscreen.width = width;
+  offscreen.height = height;
+  const offscreenContext = offscreen.getContext("2d", { alpha: false });
+  offscreenContext.fillStyle = "#050505";
+  offscreenContext.fillRect(0, 0, width, height);
+  for (const sample of state.data.samples) {
+    const y0 = yFor(sample.start) - box.mapTop + padding;
+    const y1 = yFor(sample.end) - box.mapTop + padding;
+    if (y1 < padding || y0 > box.height + padding) continue;
+    offscreenContext.fillStyle = sample.color;
+    offscreenContext.fillRect(0, Math.floor(y0), width, Math.max(1, Math.ceil(y1 - y0)));
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(box.mapLeft, box.mapTop, box.mapWidth, box.height);
+  ctx.clip();
+  ctx.filter = `blur(${radius}px)`;
+  ctx.drawImage(offscreen, box.mapLeft - padding, box.mapTop - padding);
+  ctx.restore();
 }
 
 function drawOccurrenceScale(box) {
@@ -820,6 +991,34 @@ function formatPercent(value) {
   return `${(number * 100).toFixed(2)}%`;
 }
 
+smoothingMethodInput.addEventListener("change", () => {
+  state.smoothing = { ...state.smoothing, method: smoothingMethodInput.value };
+  syncSmoothingSummary();
+  syncSmoothingForm();
+  invalidateSmoothedMap();
+});
+smoothingConfigButton.addEventListener("click", () => {
+  syncSmoothingForm();
+  smoothingDialog.showModal();
+});
+document.getElementById("smoothingClose").addEventListener("click", () => smoothingDialog.close());
+document.getElementById("smoothingCancel").addEventListener("click", () => smoothingDialog.close());
+document.getElementById("smoothingReset").addEventListener("click", () => {
+  syncSmoothingForm({ ...DEFAULT_SMOOTHING, method: smoothingMethodInput.value });
+});
+smoothingForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!smoothingForm.reportValidity()) return;
+  state.smoothing = readSmoothingForm();
+  syncSmoothingSummary();
+  syncSmoothingForm();
+  smoothingDialog.close();
+  invalidateSmoothedMap();
+});
+smoothingDialog.addEventListener("click", (event) => {
+  if (event.target === smoothingDialog) smoothingDialog.close();
+});
+
 bookSelect.addEventListener("change", () => selectBook(bookSelect.value));
 mapTypeSelect.addEventListener("change", () => selectMap(mapTypeSelect.value));
 document.getElementById("zoomIn").addEventListener("click", () => {
@@ -861,6 +1060,7 @@ window.addEventListener("resize", resizeCanvas);
 
 resizeCanvas();
 syncSummaryVisibility();
+syncSmoothingSummary();
 loadMaps(new URLSearchParams(window.location.search).get("map") || "").catch((error) => {
   state.loadingMaps = false;
   state.loadError = error.message || "Map list unavailable.";

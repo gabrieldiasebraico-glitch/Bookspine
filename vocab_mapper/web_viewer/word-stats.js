@@ -25,6 +25,9 @@ const kdeConfigButton = document.getElementById("kdeConfigButton");
 const kdeConfigPanel = document.getElementById("kdeConfigPanel");
 const kdeScaleSelect = document.getElementById("kdeScale");
 const kdeYScaleSelect = document.getElementById("kdeYScale");
+const kdeBandwidthInput = document.getElementById("kdeBandwidth");
+const kdeXMaxInput = document.getElementById("kdeXMax");
+const kdeYMaxInput = document.getElementById("kdeYMax");
 const kdeVerticalLinesInput = document.getElementById("kdeVerticalLines");
 const kdeHorizontalLinesInput = document.getElementById("kdeHorizontalLines");
 const kdeMeanLineInput = document.getElementById("kdeMeanLine");
@@ -352,9 +355,7 @@ function renderActiveFilters() {
 }
 
 function drawKdeChart(rows) {
-  resizeKdeCanvas();
-  const width = kdeCanvas.clientWidth;
-  const height = kdeCanvas.clientHeight;
+  const { width, height } = resizeKdeCanvas();
   kdeCtx.clearRect(0, 0, width, height);
   kdeCtx.fillStyle = "#101112";
   kdeCtx.fillRect(0, 0, width, height);
@@ -365,12 +366,16 @@ function drawKdeChart(rows) {
     return;
   }
 
-  const margin = { left: 54, right: 18, top: 18, bottom: 38 };
+  const margin = { left: 72, right: 18, top: 18, bottom: 58 };
   const plotW = Math.max(1, width - margin.left - margin.right);
   const plotH = Math.max(1, height - margin.top - margin.bottom);
   const xMin = series.xMin;
   const xMax = series.xMax;
-  const yMax = Math.max(...series.points.map((point) => point.y), 1e-12);
+  const automaticYMax = Math.max(...series.points.map((point) => point.y), 1e-12);
+  const configuredYMax = parseNumber(kdeYMaxInput.value);
+  const yMax = configuredYMax !== null && configuredYMax > 0
+    ? configuredYMax
+    : automaticYMax;
   const xScale = kdeScaleSelect.value;
   const yScale = kdeYScaleSelect.value;
   const txMin = transformScaleValue(xMin, xScale);
@@ -387,8 +392,12 @@ function drawKdeChart(rows) {
     return margin.top + plotH - ((transformed - tyMin) / Math.max(1e-12, tyMax - tyMin)) * plotH;
   }
 
-  drawKdeGrid(margin, plotW, plotH, xMin, xMax, yMax, xFor, yFor, yScale);
+  drawKdeGrid(margin, plotW, plotH, xMin, xMax, yMax, xFor, yFor, xScale, yScale);
 
+  kdeCtx.save();
+  kdeCtx.beginPath();
+  kdeCtx.rect(margin.left, margin.top, plotW, plotH);
+  kdeCtx.clip();
   kdeCtx.strokeStyle = "#d6a43a";
   kdeCtx.lineWidth = 2;
   kdeCtx.beginPath();
@@ -402,9 +411,11 @@ function drawKdeChart(rows) {
 
   if (kdeMeanLineInput.checked) drawReferenceLine("mean", series.mean, xFor, margin, plotH, "#9ccfbe");
   if (kdeMedianLineInput.checked) drawReferenceLine("median", series.median, xFor, margin, plotH, "#b7b2df");
+  kdeCtx.restore();
 
   kdeCtx.strokeStyle = "#737679";
   kdeCtx.strokeRect(margin.left + 0.5, margin.top + 0.5, plotW, plotH);
+  drawKdeAxisLabels(kdeMetricSelect.value || "book_freq", margin, plotW, plotH, height);
 }
 
 function kdeSeries(rows) {
@@ -427,8 +438,16 @@ function kdeSeries(rows) {
 
   const rawValues = values.map((item) => item.value);
   const xMin = Math.min(...rawValues);
-  const xMax = Math.max(...rawValues);
-  const bandwidth = silvermanBandwidth(rawValues) || Math.max(1e-9, (xMax - xMin) / 30);
+  const automaticXMax = Math.max(...rawValues);
+  const configuredXMax = parseNumber(kdeXMaxInput.value);
+  const xMax = configuredXMax !== null && configuredXMax > xMin
+    ? configuredXMax
+    : automaticXMax;
+  const automaticBandwidth = silvermanBandwidth(rawValues) || Math.max(1e-9, (automaticXMax - xMin) / 30);
+  const configuredBandwidth = parseNumber(kdeBandwidthInput.value);
+  const bandwidth = configuredBandwidth !== null && configuredBandwidth > 0
+    ? configuredBandwidth
+    : automaticBandwidth;
   const totalWeight = values.reduce((sum, item) => sum + item.weight, 0);
   const points = [];
   const steps = 180;
@@ -472,37 +491,58 @@ function weightedMedian(items) {
   return ordered[ordered.length - 1].value;
 }
 
-function drawKdeGrid(margin, plotW, plotH, xMin, xMax, yMax, xFor, yFor, yScale) {
+function drawKdeGrid(margin, plotW, plotH, xMin, xMax, yMax, xFor, yFor, xScale, yScale) {
   const verticalLines = Number(kdeVerticalLinesInput.value) || 0;
   const horizontalLines = Number(kdeHorizontalLinesInput.value) || 0;
+  const txMin = transformScaleValue(xMin, xScale);
+  const txMax = transformScaleValue(xMax, xScale);
   const tyMin = transformScaleValue(0, yScale);
   const tyMax = transformScaleValue(yMax, yScale);
   kdeCtx.font = "12px Arial, Helvetica, sans-serif";
   kdeCtx.fillStyle = "#a9aaa4";
   kdeCtx.strokeStyle = "#2e3032";
   kdeCtx.lineWidth = 1;
+  kdeCtx.save();
 
+  kdeCtx.textAlign = "center";
   for (let index = 0; index <= verticalLines; index += 1) {
     const ratio = verticalLines ? index / verticalLines : 0;
-    const value = xMin + (xMax - xMin) * ratio;
+    const value = inverseScaleValue(txMin + (txMax - txMin) * ratio, xScale);
     const x = xFor(value);
+    const crispX = Math.round(x) + 0.5;
     kdeCtx.beginPath();
-    kdeCtx.moveTo(x + 0.5, margin.top);
-    kdeCtx.lineTo(x + 0.5, margin.top + plotH);
+    kdeCtx.moveTo(crispX, margin.top);
+    kdeCtx.lineTo(crispX, margin.top + plotH);
     kdeCtx.stroke();
-    kdeCtx.fillText(compactMetric(value), x - 12, margin.top + plotH + 22);
+    kdeCtx.textAlign = index === 0 ? "left" : index === verticalLines ? "right" : "center";
+    kdeCtx.fillText(compactMetric(value), x, margin.top + plotH + 22);
   }
 
+  kdeCtx.textAlign = "right";
   for (let index = 0; index <= horizontalLines; index += 1) {
     const ratio = horizontalLines ? index / horizontalLines : 0;
     const value = inverseScaleValue(tyMin + (tyMax - tyMin) * ratio, yScale);
     const y = yFor(value);
+    const crispY = Math.round(y) + 0.5;
     kdeCtx.beginPath();
-    kdeCtx.moveTo(margin.left, y + 0.5);
-    kdeCtx.lineTo(margin.left + plotW, y + 0.5);
+    kdeCtx.moveTo(margin.left, crispY);
+    kdeCtx.lineTo(margin.left + plotW, crispY);
     kdeCtx.stroke();
-    kdeCtx.fillText(compactMetric(value), 8, y + 4);
+    kdeCtx.fillText(compactMetric(value), margin.left - 10, y + 4);
   }
+  kdeCtx.restore();
+}
+
+function drawKdeAxisLabels(xLabel, margin, plotW, plotH, height) {
+  kdeCtx.save();
+  kdeCtx.fillStyle = "#eeeeea";
+  kdeCtx.font = "13px Arial, Helvetica, sans-serif";
+  kdeCtx.textAlign = "center";
+  kdeCtx.fillText(xLabel, margin.left + plotW / 2, height - 10);
+  kdeCtx.translate(16, margin.top + plotH / 2);
+  kdeCtx.rotate(-Math.PI / 2);
+  kdeCtx.fillText("Density", 0, 0);
+  kdeCtx.restore();
 }
 
 function drawReferenceLine(label, value, xFor, margin, plotH, color) {
@@ -518,14 +558,18 @@ function drawReferenceLine(label, value, xFor, margin, plotH, color) {
 }
 
 function resizeKdeCanvas() {
+  const bounds = kdeCanvas.getBoundingClientRect();
   const ratio = window.devicePixelRatio || 1;
-  const width = Math.max(1, Math.floor(kdeCanvas.clientWidth * ratio));
-  const height = Math.max(1, Math.floor(kdeCanvas.clientHeight * ratio));
-  if (kdeCanvas.width !== width || kdeCanvas.height !== height) {
-    kdeCanvas.width = width;
-    kdeCanvas.height = height;
+  const displayWidth = Math.max(1, bounds.width);
+  const displayHeight = Math.max(1, bounds.height);
+  const pixelWidth = Math.max(1, Math.round(displayWidth * ratio));
+  const pixelHeight = Math.max(1, Math.round(displayHeight * ratio));
+  if (kdeCanvas.width !== pixelWidth || kdeCanvas.height !== pixelHeight) {
+    kdeCanvas.width = pixelWidth;
+    kdeCanvas.height = pixelHeight;
   }
-  kdeCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  kdeCtx.setTransform(pixelWidth / displayWidth, 0, 0, pixelHeight / displayHeight, 0, 0);
+  return { width: displayWidth, height: displayHeight };
 }
 
 function drawKdeMessage(text) {
@@ -536,10 +580,11 @@ function drawKdeMessage(text) {
 
 function compactMetric(value) {
   const abs = Math.abs(value);
-  if (abs >= 1000) return value.toExponential(1);
+  if (abs >= 10000 || (abs > 0 && abs < 0.001)) return value.toExponential(2);
+  if (abs >= 100) return value.toFixed(0);
   if (abs >= 1) return value.toFixed(2).replace(/\.?0+$/, "");
   if (abs === 0) return "0";
-  return value.toPrecision(2);
+  return value.toFixed(3).replace(/\.?0+$/, "");
 }
 
 function setStatsStatus(text, isError = false) {
@@ -585,6 +630,9 @@ for (const control of [
   kdeMetricSelect,
   kdeScaleSelect,
   kdeYScaleSelect,
+  kdeBandwidthInput,
+  kdeXMaxInput,
+  kdeYMaxInput,
   kdeVerticalLinesInput,
   kdeHorizontalLinesInput,
   kdeMeanLineInput,

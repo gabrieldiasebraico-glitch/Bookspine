@@ -168,3 +168,31 @@ def metric_color(
     if is_ngram_frequency_metric(metric):
         return grayscale_color(value, max_value, scale)
     return grayscale_color(value, max_value, scale)
+
+
+def normalized_metric_value(
+    value: float,
+    metric: str,
+    scale: str,
+    min_value: float,
+    max_value: float,
+) -> float:
+    """Convert a metric value to its signed or positive display intensity."""
+    metric = resolve_metric_name(metric)
+    if metric in DIVERGING_METRICS:
+        if value < 0:
+            return -min(abs(value) / abs(min_value), 1.0) if min_value < 0 else 0.0
+        return min(value / max_value, 1.0) if max_value > 0 else 0.0
+    return max(0.0, min(1.0, scale_value(value, max_value, scale)))
+
+
+def normalized_metric_color(value: float, metric: str) -> tuple[int, int, int]:
+    """Color a normalized display value without reapplying metric scaling."""
+    metric = resolve_metric_name(metric)
+    value = max(-1.0, min(1.0, value))
+    if metric in MAGENTA_WHITE_GREEN_METRICS:
+        return signed_color(value, -1.0, 1.0, MAGENTA, GREEN)
+    if metric in DIVERGING_METRICS:
+        return signed_color(value, -1.0, 1.0, RED, BLUE)
+    channel = round(max(0.0, value) * 255)
+    return channel, channel, channel

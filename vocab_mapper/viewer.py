@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import Counter, OrderedDict
 from concurrent.futures import Future
 import csv
 import hashlib
@@ -26,12 +26,16 @@ from vocab_mapper.stats import (
     book_stats_output_path,
     write_book_stats_txt,
 )
+from vocab_mapper.smoothing import SmoothingConfig, config_from_query, smooth_values
 from vocab_mapper.word_metrics_csv import prepare_word_metrics_csv
 from vocab_mapper.viewer_rendering import (
+    MetricColorScale,
     metric_color,
     metric_color_scale,
     metric_palette,
     metric_values,
+    normalized_metric_color,
+    normalized_metric_value,
 )
 from vocab_mapper.metrics import (
     BOOK_AVG_DEV,
@@ -1133,6 +1137,11 @@ class LoadedMap:
         self.word_classes: list[str] = []
         self.rows: list[dict[str, str]] = []
         self._mode_cache: dict[bool, tuple[list[float], list[tuple[int, int, int]]]] = {}
+        self._smoothing_cache: OrderedDict[
+            tuple[bool, SmoothingConfig],
+            tuple[list[float] | None, list[float], list[tuple[int, int, int]]],
+        ] = OrderedDict()
+        self._display_score_cache: dict[bool, tuple[MetricColorScale, list[float]]] = {}
         self._mode_lock = threading.Lock()
         self.chapters: list[int] = []
         self.paragraphs: list[int] = []
@@ -1210,22 +1219,131 @@ class LoadedMap:
             self._mode_cache[class_discrimination] = result
             return result
 
+    def _display_scale_and_scores(
+        self,
+        values: list[float],
+        class_discrimination: bool,
+    ) -> tuple[MetricColorScale, list[float]]:
+        with self._mode_lock:
+            cached = self._display_score_cache.get(class_discrimination)
+            if cached is not None:
+                return cached
+
+        color_scale = metric_color_scale(
+            self.rows,
+            values,
+            self.metric,
+            class_discrimination,
+        )
+        scores = [
+            normalized_metric_value(
+                value,
+                self.metric,
+                self.scale,
+                color_scale.min_value,
+                color_scale.row_max_values[index],
+            )
+            for index, value in enumerate(values)
+        ]
+        result = (color_scale, scores)
+        with self._mode_lock:
+            self._display_score_cache[class_discrimination] = result
+        return result
+
+    def _smoothed_view(
+        self,
+        class_discrimination: bool,
+        smoothing: SmoothingConfig | None,
+        pixels_per_occurrence: float | None,
+    ) -> tuple[
+        list[float],
+        list[float] | None,
+        list[float],
+        list[tuple[int, int, int]],
+        SmoothingConfig,
+    ]:
+        values, base_colors = self._values_and_colors(class_discrimination)
+        config = (smoothing or SmoothingConfig()).resolved_for_zoom(pixels_per_occurrence)
+        color_scale, base_scores = self._display_scale_and_scores(values, class_discrimination)
+        if config.method in {"none", "display_blur"}:
+            return values, None, base_scores, base_colors, config
+
+        cache_key = (class_discrimination, config)
+        with self._mode_lock:
+            cached = self._smoothing_cache.get(cache_key)
+            if cached is not None:
+                self._smoothing_cache.move_to_end(cache_key)
+                smoothed_metric_values, scores, colors = cached
+                return values, smoothed_metric_values, scores, colors, config
+
+        structures = {
+            "sentence": self.sentences,
+            "paragraph": self.paragraphs,
+            "chapter": self.chapters,
+        }
+        smoothed_metric_values: list[float] | None = None
+        if config.domain == "normalized":
+            scores = smooth_values(base_scores, config, structures)
+        else:
+            working_values = values
+            if config.domain == "log":
+                working_values = [
+                    math.copysign(math.log1p(abs(value)), value)
+                    for value in values
+                ]
+            smoothed_metric_values = smooth_values(working_values, config, structures)
+            if config.domain == "log":
+                smoothed_metric_values = [
+                    math.copysign(math.expm1(abs(value)), value)
+                    for value in smoothed_metric_values
+                ]
+            scores = [
+                normalized_metric_value(
+                    value,
+                    self.metric,
+                    self.scale,
+                    color_scale.min_value,
+                    color_scale.row_max_values[index],
+                )
+                for index, value in enumerate(smoothed_metric_values)
+            ]
+
+        if metric_palette(self.metric) == "black-white":
+            scores = [max(0.0, min(1.0, value)) for value in scores]
+        else:
+            scores = [max(-1.0, min(1.0, value)) for value in scores]
+        colors = [normalized_metric_color(value, self.metric) for value in scores]
+        cached_result = (smoothed_metric_values, scores, colors)
+        with self._mode_lock:
+            self._smoothing_cache[cache_key] = cached_result
+            self._smoothing_cache.move_to_end(cache_key)
+            while len(self._smoothing_cache) > 8:
+                self._smoothing_cache.popitem(last=False)
+        return values, smoothed_metric_values, scores, colors, config
+
     def viewport(
         self,
         start: int,
         end: int,
         limit: int,
         class_discrimination: bool = True,
+        smoothing: SmoothingConfig | None = None,
+        pixels_per_occurrence: float | None = None,
     ) -> dict[str, object]:
-        values, colors = self._values_and_colors(class_discrimination)
+        values, smoothed_values, display_scores, colors, resolved_smoothing = self._smoothed_view(
+            class_discrimination,
+            smoothing,
+            pixels_per_occurrence,
+        )
         start = max(0, min(start, self.total_rows))
         end = max(start + 1, min(end, self.total_rows))
         visible_count = end - start
         limit = max(16, min(limit, 5000))
 
         if visible_count <= limit:
-            samples: list[dict[str, object]] = [
-                {
+            samples = []
+            for index in range(start, end):
+                sample: dict[str, object] = {
                     "start": index,
                     "end": index + 1,
                     "color": _hex(colors[index]),
@@ -1238,8 +1356,11 @@ class LoadedMap:
                     "paragraph": self.paragraphs[index],
                     "sentence": self.sentences[index],
                 }
-                for index in range(start, end)
-            ]
+                if smoothed_values is not None:
+                    sample["smoothedMetricValue"] = smoothed_values[index]
+                if resolved_smoothing.method != "none":
+                    sample["smoothedDisplayValue"] = display_scores[index]
+                samples.append(sample)
             mode = "rows"
         else:
             samples = []
@@ -1250,11 +1371,12 @@ class LoadedMap:
                 if sample_index == limit - 1:
                     bin_end = end
                 bin_end = max(bin_start + 1, min(bin_end, end))
+                average_score = sum(display_scores[bin_start:bin_end]) / (bin_end - bin_start)
                 samples.append(
                     {
                         "start": bin_start,
                         "end": bin_end,
-                        "color": _hex(_average_color(colors, bin_start, bin_end)),
+                        "color": _hex(normalized_metric_color(average_score, self.metric)),
                     }
                 )
             mode = "bins"
@@ -1265,6 +1387,13 @@ class LoadedMap:
             "end": end,
             "totalRows": self.total_rows,
             "samples": samples,
+            "smoothing": {
+                "method": resolved_smoothing.method,
+                "bandwidth": resolved_smoothing.bandwidth,
+                "window": resolved_smoothing.window,
+                "domain": resolved_smoothing.domain,
+                "boundary": resolved_smoothing.boundary,
+            },
             "segments": {
                 key: [
                     {"start": max(segment.start, start), "end": min(segment.end, end), "value": segment.value}
@@ -1728,6 +1857,12 @@ class ViewerHandler(SimpleHTTPRequestHandler):
         end = _parse_query_int(params, "end", min(loaded.total_rows, 2000))
         limit = _parse_query_int(params, "limit", 1200)
         class_discrimination = _parse_query_bool(params, "classDiscrimination", True)
+        pixels_per_occurrence = _parse_query_float(params, "pixelsPerOccurrence", 1.0)
+        try:
+            smoothing = config_from_query(params)
+        except ValueError as exc:
+            _json_response(self, {"error": str(exc)}, 400)
+            return
         _json_response(
             self,
             loaded.viewport(
@@ -1735,6 +1870,8 @@ class ViewerHandler(SimpleHTTPRequestHandler):
                 end,
                 limit,
                 class_discrimination=class_discrimination,
+                smoothing=smoothing,
+                pixels_per_occurrence=pixels_per_occurrence,
             ),
         )
 
@@ -1767,6 +1904,16 @@ def _parse_query_int(params: dict[str, list[str]], key: str, fallback: int) -> i
         return fallback
     try:
         return int(float(values[0]))
+    except ValueError:
+        return fallback
+
+
+def _parse_query_float(params: dict[str, list[str]], key: str, fallback: float) -> float:
+    values = params.get(key)
+    if not values:
+        return fallback
+    try:
+        return float(values[0])
     except ValueError:
         return fallback
 

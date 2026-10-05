@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from vocab_mapper import viewer
+from vocab_mapper.smoothing import SmoothingConfig
 
 
 class ViewerStateConcurrencyTests(unittest.TestCase):
@@ -282,6 +283,55 @@ class ViewerGenerationTests(unittest.TestCase):
             global_colors,
             [(159, 159, 159), (80, 80, 80), (255, 255, 255), (128, 128, 128)],
         )
+
+    def test_interactive_viewport_applies_gaussian_smoothing_before_coloring(self):
+        input_csv = self.temp_path / "smoothing.csv"
+        with input_csv.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(
+                csv_file,
+                fieldnames=[
+                    "word",
+                    "normalized_word",
+                    "word_class",
+                    "paragraph_number",
+                    "book_avg_dev",
+                ],
+            )
+            writer.writeheader()
+            for index, value in enumerate([-1.0] * 10 + [1.0] * 10):
+                writer.writerow(
+                    {
+                        "word": f"word{index}",
+                        "normalized_word": f"word{index}",
+                        "word_class": "semantic",
+                        "paragraph_number": 1,
+                        "book_avg_dev": value,
+                    }
+                )
+
+        loaded_map = viewer.LoadedMap(
+            {
+                "csvPath": input_csv.as_posix(),
+                "metric": "book_avg_dev",
+                "scale": "linear",
+            }
+        )
+        result = loaded_map.viewport(
+            0,
+            20,
+            100,
+            smoothing=SmoothingConfig(
+                method="gaussian",
+                bandwidth=2,
+                domain="normalized",
+            ),
+        )
+
+        self.assertEqual(result["smoothing"]["method"], "gaussian")
+        self.assertEqual(result["mode"], "rows")
+        self.assertIn("smoothedDisplayValue", result["samples"][9])
+        self.assertGreater(result["samples"][9]["smoothedDisplayValue"], -1)
+        self.assertLess(result["samples"][10]["smoothedDisplayValue"], 1)
 
     def test_discovers_book_only_and_available_ngram_corpora(self):
         self.write_ngram_file("eng_fiction_2019_all_ngram_frequencies.csv")

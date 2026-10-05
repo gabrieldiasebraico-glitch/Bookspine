@@ -106,6 +106,14 @@ Pages:
 - `/viewer.html` scans `output\maps`, resolves matching occurrence CSVs, hides excluded historical metrics, and groups maps by canonical book and metric.
 - `/word-stats.html` loads saved word metrics CSVs or a local CSV for filtering, sorting, column selection, and color scaling.
 
+The map viewer's **Smoothing** menu supports moving average, Gaussian kernel,
+median, Savitzky-Golay, exponential, adaptive Gaussian, structure-aware
+Gaussian, and visual-only display blur modes. Select **Configure** to set the
+kernel bandwidth or window, boundary behavior, smoothing domain, adaptive
+strength, structural boundaries, and zoom-adaptive behavior. Analytical modes
+smooth metric values in memory and do not modify occurrence CSVs or generated
+map files.
+
 Generated source copies, occurrence CSVs, map files, and stats are written under `output\source_texts`, `output\CSV Ocurrence Maps\generated`, `output\maps\generated`, and `output\book_stats`.
 
 ## Batch Workflow

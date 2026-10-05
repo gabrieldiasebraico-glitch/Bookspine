@@ -27,6 +27,22 @@
         <span>Map</span>
         <select id="mapTypeSelect"></select>
       </label>
+      <label class="field smoothing-field">
+        <span>Smoothing</span>
+        <select id="smoothingMethod">
+          <option value="none">None</option>
+          <option value="moving_average">Moving average</option>
+          <option value="gaussian">Gaussian kernel</option>
+          <option value="median">Median filter</option>
+          <option value="savitzky_golay">Savitzky-Golay</option>
+          <option value="exponential">Exponential moving average</option>
+          <option value="adaptive_gaussian">Adaptive Gaussian</option>
+          <option value="structure_gaussian">Structure-aware Gaussian</option>
+          <option value="display_blur">Display blur (visual only)</option>
+        </select>
+      </label>
+      <button id="smoothingConfigButton" type="button">Configure</button>
+      <output id="smoothingSummary" class="smoothing-summary">Unsmoothed</output>
       <button id="zoomOut" type="button" aria-label="Zoom out">-</button>
       <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
       <button id="fit" type="button">Fit</button>
@@ -51,6 +67,90 @@
     <main class="viewer">
       <canvas id="viewerCanvas"></canvas>
     </main>
+    <dialog id="smoothingDialog" class="config-dialog" aria-labelledby="smoothingDialogTitle">
+      <form id="smoothingForm">
+        <header class="config-dialog-head">
+          <div>
+            <h2 id="smoothingDialogTitle">Smoothing configuration</h2>
+            <p>Controls affect the interactive map only; source occurrence data remains unchanged.</p>
+          </div>
+          <button id="smoothingClose" class="icon-button" type="button" aria-label="Close">&times;</button>
+        </header>
+        <div class="config-grid">
+          <label class="config-field" data-methods="gaussian adaptive_gaussian structure_gaussian">
+            <span>Kernel bandwidth (&sigma;, words)</span>
+            <input id="smoothingBandwidth" type="number" min="0.1" max="5000" step="0.1" value="50">
+            <small>Larger values reveal broader passage-level patterns.</small>
+          </label>
+          <label class="config-field" data-methods="moving_average median savitzky_golay">
+            <span>Window size (words)</span>
+            <input id="smoothingWindow" type="number" min="3" max="501" step="2" value="51">
+            <small>An odd window is enforced.</small>
+          </label>
+          <label class="config-field" data-methods="savitzky_golay">
+            <span>Polynomial order</span>
+            <input id="smoothingPolynomial" type="number" min="1" max="9" step="1" value="3">
+          </label>
+          <label class="config-field" data-methods="exponential">
+            <span>EMA alpha</span>
+            <input id="smoothingAlpha" type="number" min="0.001" max="1" step="0.001" value="0.2">
+            <small>Lower values produce stronger smoothing.</small>
+          </label>
+          <label class="config-field" data-methods="gaussian adaptive_gaussian structure_gaussian">
+            <span>Kernel cutoff (&sigma;)</span>
+            <input id="smoothingCutoff" type="number" min="1" max="6" step="0.25" value="4">
+          </label>
+          <label class="config-field" data-methods="adaptive_gaussian">
+            <span>Adaptive strength</span>
+            <input id="smoothingAdaptiveStrength" type="number" min="0.1" max="10" step="0.1" value="1">
+            <small>Higher values preserve more abrupt local changes.</small>
+          </label>
+          <label class="config-field" data-methods="structure_gaussian">
+            <span>Structure boundary</span>
+            <select id="smoothingStructure">
+              <option value="sentence">Sentence</option>
+              <option value="paragraph" selected>Paragraph</option>
+              <option value="chapter">Chapter</option>
+            </select>
+          </label>
+          <label class="config-field" data-methods="moving_average gaussian median savitzky_golay exponential adaptive_gaussian">
+            <span>Edge handling</span>
+            <select id="smoothingBoundary">
+              <option value="reflect" selected>Reflect at book edges</option>
+              <option value="truncate">Truncate and renormalize</option>
+              <option value="sentence">Stop at sentences</option>
+              <option value="paragraph">Stop at paragraphs</option>
+              <option value="chapter">Stop at chapters</option>
+            </select>
+          </label>
+          <label class="config-field" data-methods="moving_average gaussian median savitzky_golay exponential adaptive_gaussian structure_gaussian">
+            <span>Smoothing domain</span>
+            <select id="smoothingDomain">
+              <option value="normalized" selected>Normalized display values</option>
+              <option value="raw">Raw metric values</option>
+              <option value="log">Signed log metric values</option>
+            </select>
+            <small>Normalized is recommended when class normalization is enabled.</small>
+          </label>
+          <label class="config-field check config-check" data-methods="moving_average gaussian median savitzky_golay exponential adaptive_gaussian structure_gaussian">
+            <input id="smoothingZoomAdaptive" type="checkbox">
+            <span>Increase smoothing when zoomed out</span>
+          </label>
+          <label class="config-field" data-methods="display_blur">
+            <span>Blur radius (screen pixels)</span>
+            <input id="smoothingBlurRadius" type="number" min="0.25" max="20" step="0.25" value="2">
+            <small>This is cosmetic and does not aggregate metric values.</small>
+          </label>
+          <p id="smoothingNoneMessage" class="config-message">No smoothing is applied. Zoomed-out binning still summarizes rows to fit the viewport.</p>
+        </div>
+        <footer class="config-actions">
+          <button id="smoothingReset" type="button">Reset defaults</button>
+          <span class="action-spacer"></span>
+          <button id="smoothingCancel" type="button">Cancel</button>
+          <button id="smoothingApply" class="primary-button" type="submit">Apply</button>
+        </footer>
+      </form>
+    </dialog>
     <script src="/nav.js"></script>
     <script src="/app.js"></script>
   </body>
