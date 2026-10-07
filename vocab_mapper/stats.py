@@ -8,7 +8,6 @@ from statistics import median
 from vocab_mapper.metric_values import (
     book_frequency_by_word,
     ngram_frequency_by_word,
-    word_classes_by_word,
 )
 from vocab_mapper.prepare_csv import WordOccurrence, format_float
 from vocab_mapper.metrics import FIC_NGRAM_PREPUB_10Y_FREQ
@@ -70,22 +69,11 @@ def book_stats_from_occurrences(
 
 def book_stats_from_rows(rows: list[dict[str, str]]) -> dict[str, object]:
     class_totals = Counter(row.get("word_class", "") for row in rows)
-    word_classes = word_classes_by_word(rows)
-    frequencies = book_frequency_by_word(rows, class_discrimination=True)
-    prepub_frequencies = ngram_frequency_by_word(rows, FIC_NGRAM_PREPUB_10Y_FREQ)
-
     class_stats: dict[str, ClassBookStats] = {}
     for word_class in WORD_CLASSES:
-        book_values = [
-            value
-            for word, value in frequencies.items()
-            if word_classes.get(word) == word_class
-        ]
-        ngram_values = [
-            value
-            for word, value in prepub_frequencies.items()
-            if word_classes.get(word) == word_class
-        ]
+        class_rows = [row for row in rows if row.get("word_class", "") == word_class]
+        book_values = list(book_frequency_by_word(class_rows, class_discrimination=False).values())
+        ngram_values = list(ngram_frequency_by_word(class_rows, FIC_NGRAM_PREPUB_10Y_FREQ).values())
         class_stats[word_class] = ClassBookStats(
             word_count=class_totals[word_class],
             avg_book_f=average(book_values),

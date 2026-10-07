@@ -30,19 +30,37 @@ NGRAM_DEVIATION_SOURCES = {
     FIC_NGRAM_99_19_MED_DEV: (FIC_NGRAM_99_19_FREQ, "median"),
 }
 
+TOKEN_FREQUENCY_BASIS = "token"
+WORD_FREQUENCY_BASIS = "word"
+FREQUENCY_BASES = frozenset({TOKEN_FREQUENCY_BASIS, WORD_FREQUENCY_BASIS})
+
+
+def normalize_frequency_basis(frequency_basis: str | None) -> str:
+    """Validate the denominator used for book-frequency calculations."""
+    normalized = (frequency_basis or TOKEN_FREQUENCY_BASIS).strip().lower()
+    if normalized not in FREQUENCY_BASES:
+        choices = ", ".join(sorted(FREQUENCY_BASES))
+        raise ValueError(f"Unsupported frequency basis {frequency_basis!r}; expected {choices}.")
+    return normalized
+
 
 def row_metric_values(
     rows: list[dict[str, str]],
     metric: str,
     class_discrimination: bool = True,
+    frequency_basis: str = TOKEN_FREQUENCY_BASIS,
 ) -> list[float]:
     metric = resolve_metric_name(metric)
-    if class_discrimination and rows:
+    frequency_basis = normalize_frequency_basis(frequency_basis)
+    book_metrics = (BOOK_FREQ, BOOK_AVG_DEV, BOOK_MED_DEV)
+    if class_discrimination and rows and (
+        metric not in book_metrics or frequency_basis == TOKEN_FREQUENCY_BASIS
+    ):
         for candidate in metric_column_candidates(metric):
             if candidate in rows[0]:
                 return numeric_column_values(rows, metric)
-    if metric in (BOOK_FREQ, BOOK_AVG_DEV, BOOK_MED_DEV):
-        return book_metric_values(rows, metric, class_discrimination)
+    if metric in book_metrics:
+        return book_metric_values(rows, metric, class_discrimination, frequency_basis)
     if metric in NGRAM_DEVIATION_SOURCES:
         return ngram_deviation_values(rows, metric, class_discrimination)
     return numeric_column_values(rows, metric)
@@ -52,16 +70,28 @@ def book_metric_values(
     rows: list[dict[str, str]],
     metric: str,
     class_discrimination: bool,
+    frequency_basis: str = TOKEN_FREQUENCY_BASIS,
 ) -> list[float]:
-    frequencies = book_frequency_by_word(rows, class_discrimination)
+    if class_discrimination:
+        grouped = defaultdict(list)
+        for index, row in enumerate(rows):
+            grouped[row.get("word_class", "")].append((index, row))
+        result = [0.0] * len(rows)
+        for members in grouped.values():
+            group = [row for _index, row in members]
+            for (index, _row), value in zip(members, book_metric_values(group, metric, False, frequency_basis)):
+                result[index] = value
+        return result
+
+    frequencies = book_frequency_by_word(rows, class_discrimination, frequency_basis)
     if metric == BOOK_FREQ:
-        return [frequencies.get(row.get("normalized_word", ""), 0) for row in rows]
+        return [frequencies.get(_row_word(row), 0) for row in rows]
 
     stats = stats_for_words(frequencies, word_classes_by_word(rows), class_discrimination)
     statistic = "average" if metric == BOOK_AVG_DEV else "median"
     values: list[float] = []
     for row in rows:
-        word = row.get("normalized_word", "")
+        word = _row_word(row)
         word_class = row.get("word_class", "")
         frequency = frequencies.get(word)
         denominator = class_stat(stats, word_class, statistic, class_discrimination)
@@ -74,12 +104,23 @@ def ngram_deviation_values(
     metric: str,
     class_discrimination: bool,
 ) -> list[float]:
+    if class_discrimination:
+        grouped = defaultdict(list)
+        for index, row in enumerate(rows):
+            grouped[row.get("word_class", "")].append((index, row))
+        result = [0.0] * len(rows)
+        for members in grouped.values():
+            group = [row for _index, row in members]
+            for (index, _row), value in zip(members, ngram_deviation_values(group, metric, False)):
+                result[index] = value
+        return result
+
     frequency_metric, statistic = NGRAM_DEVIATION_SOURCES[metric]
     frequencies = ngram_frequency_by_word(rows, frequency_metric)
     stats = stats_for_words(frequencies, word_classes_by_word(rows), class_discrimination)
     values: list[float] = []
     for row in rows:
-        word = row.get("normalized_word", "")
+        word = _row_word(row)
         word_class = row.get("word_class", "")
         frequency = frequencies.get(word)
         denominator = class_stat(stats, word_class, statistic, class_discrimination)
@@ -104,7 +145,7 @@ def ngram_frequency_by_word(
     candidates = metric_column_candidates(frequency_metric)
     frequencies: dict[str, float] = {}
     for row in rows:
-        word = row.get("normalized_word", "")
+        word = _row_word(row)
         if not word or word in frequencies:
             continue
         for candidate in candidates:
@@ -118,29 +159,51 @@ def ngram_frequency_by_word(
 def book_frequency_by_word(
     rows: list[dict[str, str]],
     class_discrimination: bool,
-) -> dict[str, float]:
+    frequency_basis: str = TOKEN_FREQUENCY_BASIS,
+) -> dict[str | tuple[str, str], float]:
+    """Use (word, class) keys for ambiguous words when normalizing by class."""
+    frequency_basis = normalize_frequency_basis(frequency_basis)
     if not rows:
         return {}
-    word_counts = Counter(row.get("normalized_word", "") for row in rows)
+    valid_rows = [(_row_word(row), row.get("word_class", "")) for row in rows]
+    valid_rows = [(word, word_class) for word, word_class in valid_rows if word]
+    word_counts = Counter(word for word, _word_class in valid_rows)
     if not class_discrimination:
-        total = len(rows)
-        return {word: count / total for word, count in word_counts.items() if word}
+        total = (
+            len(valid_rows)
+            if frequency_basis == TOKEN_FREQUENCY_BASIS
+            else len(word_counts)
+        )
+        if not total:
+            return {}
+        return {word: count / total for word, count in word_counts.items()}
 
-    class_totals = Counter(row.get("word_class", "") for row in rows)
-    word_classes = word_classes_by_word(rows)
+    classes_by_word = defaultdict(set)
+    pair_counts = Counter(valid_rows)
+    for word, word_class in pair_counts:
+        classes_by_word[word].add(word_class)
+    class_totals = Counter(
+        word_class for _word, word_class in
+        (valid_rows if frequency_basis == TOKEN_FREQUENCY_BASIS else pair_counts)
+    )
     return {
-        word: count / class_totals[word_classes[word]]
-        for word, count in word_counts.items()
-        if word and class_totals[word_classes[word]]
+        ((word, word_class) if len(classes_by_word[word]) > 1 else word):
+        count / class_totals[word_class]
+        for (word, word_class), count in pair_counts.items()
     }
 
 
 def word_classes_by_word(rows: list[dict[str, str]]) -> dict[str, str]:
     return {
-        row.get("normalized_word", ""): row.get("word_class", "")
+        _row_word(row): row.get("word_class", "")
         for row in rows
-        if row.get("normalized_word")
+        if _row_word(row)
     }
+
+
+def _row_word(row: dict[str, str]) -> str:
+    """Return the normalized key, retaining support for legacy word-only CSVs."""
+    return (row.get("normalized_word") or row.get("word") or "").lower()
 
 
 def stats_for_words(

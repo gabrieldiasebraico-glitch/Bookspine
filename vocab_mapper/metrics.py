@@ -39,8 +39,8 @@ METRIC_SPECS: tuple[MetricSpec, ...] = (
         label="book_freq",
         slug="book_freq",
         definition=(
-            "count(normalized_word) / total word occurrences in the same word_class "
-            "when class discrimination is enabled"
+            "count(normalized_word) / selected frequency-basis total; the denominator "
+            "is restricted to the same word_class when class discrimination is enabled"
         ),
         palette="black-white",
         aliases=("book_frequency", "frequency_total_F", "book_frequency_F"),

@@ -27,6 +27,7 @@ from vocab_mapper.stats import (
     write_book_stats_txt,
 )
 from vocab_mapper.smoothing import SmoothingConfig, config_from_query, smooth_values
+from vocab_mapper.metric_values import TOKEN_FREQUENCY_BASIS, normalize_frequency_basis
 from vocab_mapper.word_metrics_csv import prepare_word_metrics_csv
 from vocab_mapper.viewer_rendering import (
     MetricColorScale,
@@ -1136,12 +1137,16 @@ class LoadedMap:
         self.normalized_words: list[str] = []
         self.word_classes: list[str] = []
         self.rows: list[dict[str, str]] = []
-        self._mode_cache: dict[bool, tuple[list[float], list[tuple[int, int, int]]]] = {}
+        self._mode_cache: dict[
+            tuple[bool, str], tuple[list[float], list[tuple[int, int, int]]]
+        ] = {}
         self._smoothing_cache: OrderedDict[
-            tuple[bool, SmoothingConfig],
+            tuple[bool, str, SmoothingConfig],
             tuple[list[float] | None, list[float], list[tuple[int, int, int]]],
         ] = OrderedDict()
-        self._display_score_cache: dict[bool, tuple[MetricColorScale, list[float]]] = {}
+        self._display_score_cache: dict[
+            tuple[bool, str], tuple[MetricColorScale, list[float]]
+        ] = {}
         self._mode_lock = threading.Lock()
         self.chapters: list[int] = []
         self.paragraphs: list[int] = []
@@ -1153,6 +1158,12 @@ class LoadedMap:
     @property
     def total_rows(self) -> int:
         return len(self.words)
+
+    def _effective_frequency_basis(self, frequency_basis: str) -> str:
+        normalized = normalize_frequency_basis(frequency_basis)
+        if resolve_metric_name(self.metric) not in BOOK_MAP_METRICS:
+            return TOKEN_FREQUENCY_BASIS
+        return normalized
 
     def _load(self) -> None:
         with self.csv_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
@@ -1179,7 +1190,10 @@ class LoadedMap:
             for key, segments in self._segments.items()
         }
         self.entry["totalRows"] = len(self.words)
-        values, _colors = self._values_and_colors(class_discrimination=True)
+        values, _colors = self._values_and_colors(
+            class_discrimination=True,
+            frequency_basis=TOKEN_FREQUENCY_BASIS,
+        )
         self.entry["minValue"] = min(values) if values else 0
         self.entry["maxValue"] = max(values) if values else 0
         self.entry["maxAbsValue"] = max((abs(value) for value in values), default=0)
@@ -1187,9 +1201,12 @@ class LoadedMap:
     def _values_and_colors(
         self,
         class_discrimination: bool,
+        frequency_basis: str = TOKEN_FREQUENCY_BASIS,
     ) -> tuple[list[float], list[tuple[int, int, int]]]:
+        frequency_basis = self._effective_frequency_basis(frequency_basis)
+        cache_key = (class_discrimination, frequency_basis)
         with self._mode_lock:
-            cached = self._mode_cache.get(class_discrimination)
+            cached = self._mode_cache.get(cache_key)
             if cached is not None:
                 return cached
 
@@ -1197,6 +1214,7 @@ class LoadedMap:
                 self.rows,
                 self.metric,
                 class_discrimination=class_discrimination,
+                frequency_basis=frequency_basis,
             )
             color_scale = metric_color_scale(
                 self.rows,
@@ -1216,16 +1234,19 @@ class LoadedMap:
                 for index, value in enumerate(values)
             ]
             result = (values, colors)
-            self._mode_cache[class_discrimination] = result
+            self._mode_cache[cache_key] = result
             return result
 
     def _display_scale_and_scores(
         self,
         values: list[float],
         class_discrimination: bool,
+        frequency_basis: str = TOKEN_FREQUENCY_BASIS,
     ) -> tuple[MetricColorScale, list[float]]:
+        frequency_basis = self._effective_frequency_basis(frequency_basis)
+        cache_key = (class_discrimination, frequency_basis)
         with self._mode_lock:
-            cached = self._display_score_cache.get(class_discrimination)
+            cached = self._display_score_cache.get(cache_key)
             if cached is not None:
                 return cached
 
@@ -1247,12 +1268,13 @@ class LoadedMap:
         ]
         result = (color_scale, scores)
         with self._mode_lock:
-            self._display_score_cache[class_discrimination] = result
+            self._display_score_cache[cache_key] = result
         return result
 
     def _smoothed_view(
         self,
         class_discrimination: bool,
+        frequency_basis: str,
         smoothing: SmoothingConfig | None,
         pixels_per_occurrence: float | None,
     ) -> tuple[
@@ -1262,13 +1284,18 @@ class LoadedMap:
         list[tuple[int, int, int]],
         SmoothingConfig,
     ]:
-        values, base_colors = self._values_and_colors(class_discrimination)
+        frequency_basis = self._effective_frequency_basis(frequency_basis)
+        values, base_colors = self._values_and_colors(class_discrimination, frequency_basis)
         config = (smoothing or SmoothingConfig()).resolved_for_zoom(pixels_per_occurrence)
-        color_scale, base_scores = self._display_scale_and_scores(values, class_discrimination)
+        color_scale, base_scores = self._display_scale_and_scores(
+            values,
+            class_discrimination,
+            frequency_basis,
+        )
         if config.method in {"none", "display_blur"}:
             return values, None, base_scores, base_colors, config
 
-        cache_key = (class_discrimination, config)
+        cache_key = (class_discrimination, frequency_basis, config)
         with self._mode_lock:
             cached = self._smoothing_cache.get(cache_key)
             if cached is not None:
@@ -1327,11 +1354,13 @@ class LoadedMap:
         end: int,
         limit: int,
         class_discrimination: bool = True,
+        frequency_basis: str = TOKEN_FREQUENCY_BASIS,
         smoothing: SmoothingConfig | None = None,
         pixels_per_occurrence: float | None = None,
     ) -> dict[str, object]:
         values, smoothed_values, display_scores, colors, resolved_smoothing = self._smoothed_view(
             class_discrimination,
+            frequency_basis,
             smoothing,
             pixels_per_occurrence,
         )
@@ -1386,6 +1415,7 @@ class LoadedMap:
             "start": start,
             "end": end,
             "totalRows": self.total_rows,
+            "frequencyBasis": self._effective_frequency_basis(frequency_basis),
             "samples": samples,
             "smoothing": {
                 "method": resolved_smoothing.method,
@@ -1403,8 +1433,13 @@ class LoadedMap:
             },
         }
 
-    def summary(self, class_discrimination: bool = True) -> dict[str, object]:
-        values, colors = self._values_and_colors(class_discrimination)
+    def summary(
+        self,
+        class_discrimination: bool = True,
+        frequency_basis: str = TOKEN_FREQUENCY_BASIS,
+    ) -> dict[str, object]:
+        frequency_basis = self._effective_frequency_basis(frequency_basis)
+        values, colors = self._values_and_colors(class_discrimination, frequency_basis)
         entry = self.entry
         total_words = len(self.rows)
         counts = Counter(self.word_classes)
@@ -1424,6 +1459,7 @@ class LoadedMap:
             "book": entry.get("book", ""),
             "mapType": entry.get("mapType", ""),
             "metric": self.metric,
+            "frequencyBasis": frequency_basis,
             "palette": entry.get("palette", ""),
             "bibliographic": metadata,
             "wordCounts": {
@@ -1836,9 +1872,19 @@ class ViewerHandler(SimpleHTTPRequestHandler):
 
         params = parse_qs(query)
         class_discrimination = _parse_query_bool(params, "classDiscrimination", True)
+        try:
+            frequency_basis = normalize_frequency_basis(
+                _parse_query_text(params, "frequencyBasis", TOKEN_FREQUENCY_BASIS)
+            )
+        except ValueError as exc:
+            _json_response(self, {"error": str(exc)}, 400)
+            return
         _json_response(
             self,
-            loaded.summary(class_discrimination=class_discrimination),
+            loaded.summary(
+                class_discrimination=class_discrimination,
+                frequency_basis=frequency_basis,
+            ),
         )
 
     def _handle_viewport(self, path: str, query: str) -> None:
@@ -1859,6 +1905,9 @@ class ViewerHandler(SimpleHTTPRequestHandler):
         class_discrimination = _parse_query_bool(params, "classDiscrimination", True)
         pixels_per_occurrence = _parse_query_float(params, "pixelsPerOccurrence", 1.0)
         try:
+            frequency_basis = normalize_frequency_basis(
+                _parse_query_text(params, "frequencyBasis", TOKEN_FREQUENCY_BASIS)
+            )
             smoothing = config_from_query(params)
         except ValueError as exc:
             _json_response(self, {"error": str(exc)}, 400)
@@ -1870,6 +1919,7 @@ class ViewerHandler(SimpleHTTPRequestHandler):
                 end,
                 limit,
                 class_discrimination=class_discrimination,
+                frequency_basis=frequency_basis,
                 smoothing=smoothing,
                 pixels_per_occurrence=pixels_per_occurrence,
             ),
@@ -1925,8 +1975,15 @@ def _parse_query_bool(params: dict[str, list[str]], key: str, fallback: bool) ->
     return values[0].lower() not in {"0", "false", "no", "off"}
 
 
+def _parse_query_text(params: dict[str, list[str]], key: str, fallback: str) -> str:
+    values = params.get(key)
+    if not values:
+        return fallback
+    return values[0]
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the vocabulary map overlay viewer.")
+    parser = argparse.ArgumentParser(description="Run Bookspine Alpha 0.2.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument(
@@ -1941,7 +1998,7 @@ def main() -> None:
     args = parse_args()
     server = ThreadingHTTPServer((args.host, args.port), ViewerHandler)
     url = f"http://{args.host}:{args.port}"
-    print(f"Vocabulary map viewer running at {url}")
+    print(f"Bookspine Alpha 0.2 running at {url}")
     if args.open_browser:
         webbrowser.open(url)
     try:

@@ -10,6 +10,8 @@ const panelSizeValue = document.getElementById("panelSizeValue");
 const showWordsInput = document.getElementById("showWords");
 const showStructureInput = document.getElementById("showStructure");
 const classDiscriminationInput = document.getElementById("classDiscrimination");
+const frequencyBasisInput = document.getElementById("frequencyBasis");
+const frequencyBasisField = document.getElementById("frequencyBasisField");
 const mapInfoEl = document.getElementById("mapInfo");
 const toggleSummaryButton = document.getElementById("toggleSummary");
 const smoothingMethodInput = document.getElementById("smoothingMethod");
@@ -63,6 +65,7 @@ const state = {
   zoom: 1,
   fontSize: 12,
   panelSize: 300,
+  bookFrequencyBasis: "word",
   smoothing: { ...DEFAULT_SMOOTHING },
   data: null,
   overview: null,
@@ -281,6 +284,7 @@ function viewportParams(start, end, limit, pixelsPerOccurrence) {
     end: String(end),
     limit: String(limit),
     classDiscrimination: classDiscriminationInput.checked ? "1" : "0",
+    frequencyBasis: frequencyBasisInput.value,
     pixelsPerOccurrence: String(pixelsPerOccurrence),
     smoothingMethod: config.method === "display_blur" ? "none" : config.method,
     smoothingBandwidth: String(config.bandwidth),
@@ -353,6 +357,7 @@ function selectBook(book, preferredMapId = "") {
 
 function selectMap(id) {
   state.map = state.maps.find((item) => item.id === id) || null;
+  syncFrequencyBasisControl();
   state.data = null;
   state.overview = null;
   state.summary = null;
@@ -431,7 +436,11 @@ async function fetchSummary() {
   state.summaryAbort = new AbortController();
   try {
     const classDiscrimination = classDiscriminationInput.checked ? "1" : "0";
-    const response = await fetch(`/api/maps/${state.map.id}/summary?classDiscrimination=${classDiscrimination}`, {
+    const params = new URLSearchParams({
+      classDiscrimination,
+      frequencyBasis: frequencyBasisInput.value,
+    });
+    const response = await fetch(`/api/maps/${state.map.id}/summary?${params}`, {
       signal: state.summaryAbort.signal,
     });
     state.summary = await readJsonResponse(response, "Could not load map information.");
@@ -795,6 +804,31 @@ function metricLabel(metric) {
   return String(metric || "Value").replaceAll("_", " ");
 }
 
+function mapSupportsFrequencyBasis(map = state.map) {
+  if (!map) return false;
+  return ["book_freq", "book_avg_dev", "book_med_dev"].includes(metricLabel(map.metric));
+}
+
+function frequencyBasisLabel(value) {
+  return value === "word" ? "Word based" : "Token based";
+}
+
+function syncFrequencyBasisControl() {
+  const supported = mapSupportsFrequencyBasis();
+  if (supported) {
+    frequencyBasisInput.disabled = false;
+    frequencyBasisInput.value = state.bookFrequencyBasis;
+    frequencyBasisField.title = metricLabel(state.map.metric) === "book_freq"
+      ? "Token based divides by occurrences; word based divides by distinct normalized words."
+      : "This changes the underlying book-frequency denominator. Average and median deviation ratios remain unchanged because the common scale factor cancels.";
+    return;
+  }
+  if (!frequencyBasisInput.disabled) state.bookFrequencyBasis = frequencyBasisInput.value;
+  frequencyBasisInput.value = "token";
+  frequencyBasisInput.disabled = true;
+  frequencyBasisField.title = "Corpus Ngram frequencies are supplied as token frequencies, so this setting is fixed.";
+}
+
 function formatMetricValue(value, metric) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "";
@@ -912,6 +946,7 @@ function renderSummary() {
   const deviation = summary.deviation || {};
   const rows = [
     ["Map", summary.mapType || metric],
+    ["Frequency basis", frequencyBasisLabel(summary.frequencyBasis)],
     ["Author", biblio.author || "Unknown"],
     ["Publication", biblio.publicationYear || "Unknown"],
     ["Edition", biblio.edition || "Unknown"],
@@ -1048,6 +1083,16 @@ panelSizeInput.addEventListener("input", () => {
 showWordsInput.addEventListener("change", draw);
 showStructureInput.addEventListener("change", draw);
 classDiscriminationInput.addEventListener("change", () => {
+  state.data = null;
+  state.overview = null;
+  state.summary = null;
+  renderSummary();
+  fetchSummary();
+  scheduleOverviewFetch();
+  scheduleFetch();
+});
+frequencyBasisInput.addEventListener("change", () => {
+  state.bookFrequencyBasis = frequencyBasisInput.value;
   state.data = null;
   state.overview = null;
   state.summary = null;

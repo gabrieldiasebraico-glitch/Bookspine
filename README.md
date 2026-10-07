@@ -1,40 +1,115 @@
-# Vocabulary Diversity Visual Maps
+# Bookspine
 
-This project prepares word-occurrence CSV files from full-book `.txt` files. Each CSV row is one occurrence of one word, preserving location in the book and attaching frequency/deviation metrics for visual maps.
+Bookspine creates vocabulary-diversity visual maps from full-length plain-text books. It converts each word occurrence into a structured CSV row, calculates book-relative and corpus-relative frequency metrics, and renders those measurements as static or interactive maps.
 
-## Prepare Occurrence CSVs
+## Features
+
+- Convert UTF-8 `.txt` books into occurrence-level CSV files.
+- Preserve word, sentence, paragraph, and chapter positions.
+- Compare book frequencies with Google Books English Fiction Ngram frequencies.
+- Separate functional and semantic words for class-normalized comparisons.
+- Render PNG maps and pyramidal tiled BigTIFF maps.
+- Explore maps and word statistics in a local browser-based viewer.
+- Apply analytical or display-only smoothing without modifying source CSVs or map files.
+
+## Requirements
+
+- Python 3.12 or later
+- Windows, macOS, or Linux for the command-line workflow
+- A modern web browser for the interactive viewer
+
+Run commands from the repository's root directory.
+
+## Installation
+
+Clone the repository and enter its directory:
 
 ```powershell
-python -m vocab_mapper.prepare_csv ".\books\example.txt" ".\output\example_occurrences.csv"
+git clone https://github.com/gabrieldiasebraico-glitch/Bookspine.git
+cd Bookspine
 ```
 
-With fiction Ngram frequency data:
+Create and activate a virtual environment on Windows PowerShell:
 
 ```powershell
-python -m vocab_mapper.prepare_csv ".\books\example.txt" ".\output\example_occurrences.csv" --ngram-total-csv ".\data\ngram_frequencies\eng_fiction_2019_all_ngram_frequencies.csv" --ngram-minus-10y-csv ".\data\ngram_frequencies\eng_fiction_2019_minus_10y_ngram_frequencies.csv" --ngram-1999-2019-csv ".\data\ngram_frequencies\eng_fiction_2019_recent_1999_2019_ngram_frequencies.csv"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
+python -m pip install -r requirements-viewer.txt
 ```
 
-Ngram CSVs may use `word`, `normalized_word`, or `token` for the word column, and `ngram_f`, `frequency`, or `freq` for the frequency column.
+On macOS or Linux:
 
-## Core Columns
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
+python -m pip install -r requirements-viewer.txt
+```
 
-- `word`: exact word form found in the book.
-- `normalized_word`: lowercase form used for counting and comparison.
-- `word_number`: occurrence number in the full book.
-- `word_class`: `functional` or `semantic`.
-- `position_in_sentence`, `position_in_paragraph`, `position_in_chapter`: absolute positions inside each structure.
-- `relative_position_in_sentence`, `relative_position_in_paragraph`, `relative_position_in_chapter`: relative positions inside each structure.
-- `sentence_number`, `paragraph_number`, `chapter_number`: structural location numbers.
+Windows users may instead run `INSTALL_WINDOWS.bat`, followed by `run_viewer.bat`. The offline installer requires the separately distributed Python installer and wheelhouse (including spaCy, its dependencies, and the `en_core_web_sm` 3.8.0 wheel) under `installers/`; those files are not stored in this Git repository.
 
-## Book Metrics
+## Quick Start
 
-- `book_freq`: word occurrences divided by the total word count for that word class. With class discrimination on, functional and semantic words have separate denominators. Without class discrimination, all words share one denominator.
-- `book_avg_dev`: `(book_freq / avg_book_f) - 1`, where `avg_book_f` is calculated within the active class-discrimination mode.
-- `book_med_dev`: `(book_freq / med_book_f) - 1`, where `med_book_f` is calculated within the active class-discrimination mode.
+The repository includes a small sample text for testing:
 
-`avg_book_f` and `med_book_f` are book-level parameters, not map metrics. They are written to `output\book_stats\...\*_book_stats.txt`.
+```powershell
+python -m vocab_mapper.prepare_csv ".\samples\sample_book.txt" ".\output\sample_occurrences.csv"
+```
 
-## Fiction Ngram Metrics
+Render a PNG map:
+
+```powershell
+python -m vocab_mapper.plot_visual_map ".\output\sample_occurrences.csv" ".\output\maps\sample_book_freq_linear.png" --width 2000 --metric book_freq
+```
+
+Start the interactive viewer:
+
+```powershell
+python -m vocab_mapper.viewer --port 8765 --open-browser
+```
+
+If the browser does not open automatically, visit <http://127.0.0.1:8765>.
+
+## Preparing Occurrence CSVs
+
+For a book stored locally:
+
+```powershell
+python -m vocab_mapper.prepare_csv ".\txt books\example.txt" ".\output\example_occurrences.csv"
+```
+
+With prepared fiction Ngram frequency tables:
+
+```powershell
+python -m vocab_mapper.prepare_csv ".\txt books\example.txt" ".\output\example_occurrences.csv" --ngram-total-csv ".\data\ngram_frequencies\eng_fiction_2019_all_ngram_frequencies.csv" --ngram-minus-10y-csv ".\data\ngram_frequencies\eng_fiction_2019_minus_10y_ngram_frequencies.csv" --ngram-1999-2019-csv ".\data\ngram_frequencies\eng_fiction_2019_recent_1999_2019_ngram_frequencies.csv"
+```
+
+Ngram tables may use `word`, `normalized_word`, or `token` as the word column and `ngram_f`, `frequency`, or `freq` as the frequency column.
+
+## Occurrence Columns
+
+- `word`: exact word form found in the input text.
+- `normalized_word`: lowercase form, with surrounding apostrophes removed, used for counting and comparison.
+- `word_number`: one-based occurrence number in the book.
+- `word_class`: `functional` when all spaCy components overlapping the word have POS tags ADP, AUX, CCONJ, DET, PART, PRON, or SCONJ; otherwise `semantic`.
+- `position_in_sentence`, `position_in_paragraph`, `position_in_chapter`: one-based token positions within each detected structure.
+- `relative_position_in_sentence`, `relative_position_in_paragraph`, `relative_position_in_chapter`: token position divided by the detected structure's token count.
+- `sentence_number`, `paragraph_number`, `chapter_number`: one-based structural location numbers.
+
+## Metrics
+
+### Book metrics
+
+- `book_freq`: occurrences of a normalized word divided by the total token count for its word class. When class discrimination is disabled, all words share the book's total token count.
+- `book_avg_dev`: `(book_freq / avg_book_f) - 1`.
+- `book_med_dev`: `(book_freq / med_book_f) - 1`.
+
+`avg_book_f` and `med_book_f` are calculated across **unique normalized word types within each class**, not across occurrence rows. With class discrimination enabled, Bookspine calculates separate statistics for functional and semantic word types. These parameters are written to `output\book_stats\...\*_book_stats.txt`.
+
+### Fiction Ngram metrics
 
 - `fic_ngram_total_freq`
 - `fic_ngram_total_avg_dev`
@@ -46,114 +121,129 @@ Ngram CSVs may use `word`, `normalized_word`, or `token` for the word column, an
 - `fic_ngram_99_19_avg_dev`
 - `fic_ngram_99_19_med_dev`
 
-The `avg_dev` metrics use `(frequency / class average) - 1`. The `med_dev` metrics use `(frequency / class median) - 1`. Median Absolute Deviation (`*_mad`) is intentionally excluded because it removes the sign of the difference.
+The `avg_dev` metrics use `(frequency / class average) - 1`; the `med_dev` metrics use `(frequency / class median) - 1`. These class averages and medians are also calculated across unique normalized word types. Median Absolute Deviation is not used because it discards the direction of the difference.
 
-## Parameters
+If a required denominator is missing or zero during viewer-side recalculation, the current implementation displays a deviation of zero. Treat that value as unavailable rather than as evidence that the word exactly matches the reference statistic.
 
-Each book stats file includes:
+### Statistics files
 
-- `total_words`
-- `total_functional_words`
-- `total_semantic_words`
-- `avg_book_f` and `med_book_f` for each class
-- `functional_max_book_f`, `functional_min_book_f`
-- `semantic_max_book_f`, `semantic_min_book_f`
-- `fic_ngram_prepub_10y_freq_avg` and `fic_ngram_prepub_10y_freq_med` for each class when pre-publication data is present
+Each book statistics file includes:
 
-`Ngram_Stats.txt` includes project-level fiction Ngram parameters by class:
+- Total, functional, and semantic token counts.
+- Average and median book frequencies by word class.
+- Minimum and maximum book frequencies by word class.
+- Pre-publication fiction Ngram average and median frequencies by word class, when available.
 
-- `fic_ngrams_total_freq_avg`
-- `fic_ngrams_total_freq_med`
-- `fic_ngram_99_19_freq_avg`
-- `fic_ngrams_99_19_freq_med`
+`Ngram_Stats.txt` contains project-level fiction Ngram parameters by class.
 
 ## Class Discrimination
 
-Class discrimination separates functional and semantic words before calculating frequencies and deviations. This reduces the class effect caused by function words and lexical words having very different occurrence patterns. The interactive viewer has a `Class norm` checkbox to switch the selected map between class-discriminated and no-class-discrimination values.
+Function words and lexical words have very different frequency distributions. Class discrimination calculates their statistics separately to reduce that class effect. The interactive viewer's **Class norm** control switches compatible maps between class-discriminated and combined calculations.
+
+Classification uses spaCy 3.8.16's English `en_core_web_sm` 3.8.0 model on complete sentences. ADP, AUX, CCONJ, DET, PART, PRON, and SCONJ are functional; all remaining word tags (including ADV, NUM, INTJ, and X) are semantic under the binary schema. This is a documented grouping of POS tags, not a semantic analysis. The same normalized word can occur in both classes; unique-word exports contain one row per word/class pair. Class statistics count unique words separately within each class. Ngram frequencies remain word-level and do not distinguish grammatical roles.
+
+Bookspine preserves its original word spans and positions: contractions and hyphenated words stay as one occurrence. If spaCy splits a word into components, the occurrence is functional only when every non-punctuation component is functional. For example, a noun plus possessive particle remains semantic. Processing is local after installation; there is no automatic model download or list-based fallback. Existing CSVs retain their original classification until regenerated.
 
 ## Visual Maps
 
-Render a single map:
+Render a single PNG map:
 
 ```powershell
-python -m vocab_mapper.plot_visual_map ".\output\the_fall_of_the_house_of_usher_occurrences.csv" ".\output\maps\usher_book_freq_linear.png" --width 2000 --metric book_freq
+python -m vocab_mapper.plot_visual_map ".\output\example_occurrences.csv" ".\output\maps\example_book_freq_linear.png" --width 2000 --metric book_freq
 ```
 
-For large books, use pyramidal tiled compressed BigTIFF:
+For a large book, create a pyramidal tiled compressed BigTIFF:
 
 ```powershell
-python -m vocab_mapper.plot_pyramidal_tiff ".\output\lord_of_the_rings_occurrences.csv" ".\output\maps\lord_of_the_rings_book_avg_dev_linear.pyramid.ome.tif" --width 2000 --metric book_avg_dev
+python -m vocab_mapper.plot_pyramidal_tiff ".\output\example_occurrences.csv" ".\output\maps\example_book_avg_dev_linear.pyramid.ome.tif" --width 2000 --metric book_avg_dev
 ```
 
-`book_freq` maps are black at 0 and white at the maximum `book_freq` for the active class scale. Signed deviation maps use red-white-blue: red is negative, white is zero, and blue is positive.
-Automatically generated map filenames end with `_linear` or `_log` before the image extension so both scale variants can coexist.
+`book_freq` maps run from black at zero to white at the maximum frequency for the active scale. Signed-deviation maps use red for negative values, white for zero, and blue for positive values. Automatically generated filenames include `_linear` or `_log` before the image extension.
 
 ## Interactive Viewer
 
-```powershell
-python -m vocab_mapper.viewer --port 8765
-```
+The local viewer provides:
 
-Open:
+- `/`: upload or drop a local `.txt` file, select a corpus, and choose one or more maps.
+- `/viewer.html`: explore generated maps and their matching occurrence data.
+- `/word-stats.html`: filter, sort, select columns, and color-scale saved or local word-metrics CSV files.
 
-```text
-http://127.0.0.1:8765
-```
+The **Smoothing** menu supports moving average, Gaussian kernel, median, Savitzky-Golay, exponential, adaptive Gaussian, structure-aware Gaussian, and display-only blur modes. Analytical smoothing operates in memory and does not modify occurrence CSVs or generated map files.
 
-Pages:
-
-- `/` uploads or drops a local `.txt` file, selects the corpus, and selects one or more maps from a multi-select menu.
-- `/viewer.html` scans `output\maps`, resolves matching occurrence CSVs, hides excluded historical metrics, and groups maps by canonical book and metric.
-- `/word-stats.html` loads saved word metrics CSVs or a local CSV for filtering, sorting, column selection, and color scaling.
-
-The map viewer's **Smoothing** menu supports moving average, Gaussian kernel,
-median, Savitzky-Golay, exponential, adaptive Gaussian, structure-aware
-Gaussian, and visual-only display blur modes. Select **Configure** to set the
-kernel bandwidth or window, boundary behavior, smoothing domain, adaptive
-strength, structural boundaries, and zoom-adaptive behavior. Analytical modes
-smooth metric values in memory and do not modify occurrence CSVs or generated
-map files.
-
-Generated source copies, occurrence CSVs, map files, and stats are written under `output\source_texts`, `output\CSV Ocurrence Maps\generated`, `output\maps\generated`, and `output\book_stats`.
+Generated source copies, occurrence CSVs, maps, and statistics are stored under `output`. Raw texts, corpus data, and generated outputs are intentionally excluded from Git.
 
 ## Batch Workflow
+
+Process top-level `.txt` files in `txt books`:
 
 ```powershell
 python -m vocab_mapper.batch
 ```
 
-The batch command creates missing occurrence CSVs, the first `book_freq` map, and `book_stats` files for top-level `.txt` files in `txt books`.
+The command creates missing occurrence CSVs, the first `book_freq` map, word-metrics CSVs, and book-statistics files.
 
-Render all current pyramidal maps from existing occurrence CSVs:
+Render the currently configured pyramidal maps from existing occurrence CSVs:
 
 ```powershell
 python .\scripts\prepare_ngram_maps.py --force
 ```
 
-Write stats files:
+Write statistics files:
 
 ```powershell
 python .\scripts\write_stats_files.py
 ```
 
-Plot the fiction Ngram corpus frequency density:
+Plot the fiction Ngram frequency density:
 
 ```powershell
 python .\scripts\plot_fic_ngram_corpus_kde.py
 ```
 
-This writes `output\plots\fic_ngram_total_freq_corpus_kde.png` and a JSON sidecar. The KDE is calculated over `log10(fic_ngram_total_freq)` because corpus word frequencies are highly skewed; zero-frequency words are counted in the sidecar stats and excluded from the log-scale density curve.
+The plot uses `log10(fic_ngram_total_freq)` because corpus word frequencies are highly skewed. Zero-frequency words are counted in the JSON sidecar statistics and excluded from the log-scale density curve.
 
-## Importing Google Ngram Frequencies
+## Importing Google Books Ngram Data
 
-For English Fiction 2019, download `totalcounts-1` and `1-00000-of-00001.gz` from:
+For the English Fiction 2019 corpus, obtain `totalcounts-1` and `1-00000-of-00001.gz` from the [Google Books Ngram exports](https://storage.googleapis.com/books/ngrams/books/20200217/eng-fiction/eng-fiction-1-ngrams_exports.html).
 
-```text
-https://storage.googleapis.com/books/ngrams/books/20200217/eng-fiction/eng-fiction-1-ngrams_exports.html
-```
-
-Build compact Ngram CSVs for a book:
+Build compact frequency tables for a book:
 
 ```powershell
-python -m vocab_mapper.import_ngram ".\output\the_fall_of_the_house_of_usher_occurrences.csv" ".\data\google_ngram\eng-fiction\1-00000-of-00001.gz" ".\data\google_ngram\eng-fiction\totalcounts-1" ".\data\ngram_frequencies" --publication-year 1839
+python -m vocab_mapper.import_ngram ".\output\example_occurrences.csv" ".\data\google_ngram\eng-fiction\1-00000-of-00001.gz" ".\data\google_ngram\eng-fiction\totalcounts-1" ".\data\ngram_frequencies" --publication-year 1839
 ```
+
+Review the source dataset's documentation and terms before redistributing derived corpus data. The Google Books Ngram data is not covered by Bookspine's software license.
+
+## Methodological Limitations
+
+- Tokenization recognizes Latin letters `A-Z` plus internal apostrophes and hyphens. It is not currently suitable for every language or writing system.
+- Sentence boundaries are inferred from `.`, `!`, and `?` followed by whitespace.
+- Paragraphs are inferred from blank-line separation.
+- Chapters are inferred from short headings beginning with `Chapter`, `Book`, or `Part`, or from standalone Roman-numeral headings. Unusual headings may not be detected.
+- POS classification is model-based and can make errors, especially on literary or unusual language. Review representative samples before relying on class comparisons.
+- Google Ngram frequencies reflect the composition and limitations of the selected corpus; they should not be treated as a neutral model of language.
+- Frequency-based visualizations describe textual patterns. They do not by themselves establish literary, linguistic, or causal conclusions.
+
+## Copyright and Privacy
+
+Only process texts that you are legally permitted to use. Public-domain status varies by country, and possessing a text does not necessarily grant permission to publish or redistribute it.
+
+The repository excludes `txt books`, `data`, and most of `output` to reduce the risk of committing copyrighted source texts, large corpus files, or generated copies. Verify `git status` before every public push. Do not upload confidential, personal, or restricted texts to a public repository or Zenodo record.
+
+## Citation
+
+If you use Bookspine in research, cite the archived Zenodo release corresponding to the version you used. Zenodo supplies the final DOI and formatted citation after a GitHub release has been archived.
+
+Until a DOI is assigned, cite the software as:
+
+> Gabriel Dias Ebraico. (2026). *Bookspine* (Version 1.0.0) [Computer software]. GitHub. https://github.com/gabrieldiasebraico-glitch/Bookspine
+
+Use the version-specific DOI when reproducibility requires an exact release. Use Zenodo's concept DOI when referring to Bookspine across all versions.
+
+## License
+
+Copyright (c) 2026 Gabriel Dias Ebraico
+
+Bookspine is released under the [MIT License](LICENSE). Third-party datasets, book texts, and other externally sourced materials retain their own terms and are not relicensed by this repository.
+
+The contextual classifier uses external spaCy and model packages. See [third-party notices](THIRD_PARTY_NOTICES.md) for their licenses and training-source notices.

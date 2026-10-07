@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Vocabulary Map Viewer</title>
+    <title>Bookspine Alpha 0.2 - Map Viewer</title>
     <link rel="icon" href="/assets/bookspine-logo.ico">
     <link rel="stylesheet" href="/style.css">
   </head>
   <body class="viewer-shell">
     <header class="app-head">
-      <a class="app-title" href="/">Vocabulary Maps</a>
+      <a class="app-title" href="/">Bookspine Alpha 0.2</a>
       <button id="menuButton" class="menu-button" type="button" aria-expanded="false" aria-controls="navMenu" aria-label="Open navigation">&#9776;</button>
       <nav id="navMenu" class="nav-menu" aria-label="Navigation">
         <a href="/">Upload</a>
@@ -26,6 +26,13 @@
       <label class="field">
         <span>Map</span>
         <select id="mapTypeSelect"></select>
+      </label>
+      <label id="frequencyBasisField" class="field frequency-basis-field" title="Choose whether book frequency is divided by token occurrences or distinct normalized words.">
+        <span>Frequency basis</span>
+        <select id="frequencyBasis" aria-label="Frequency basis">
+          <option value="word" selected>Word based</option>
+          <option value="token">Token based</option>
+        </select>
       </label>
       <label class="field smoothing-field">
         <span>Smoothing</span>

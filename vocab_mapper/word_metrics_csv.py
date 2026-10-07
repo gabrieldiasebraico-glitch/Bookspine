@@ -33,7 +33,7 @@ FIELDNAMES = [
 def build_word_metric_rows(
     occurrences: list[WordOccurrence],
 ) -> list[dict[str, str | int]]:
-    word_counts = Counter(occurrence.normalized_word for occurrence in occurrences)
+    word_counts = Counter((occurrence.normalized_word, occurrence.word_class) for occurrence in occurrences)
     class_totals = Counter(occurrence.word_class for occurrence in occurrences)
     word_classes = word_classes_by_word(occurrences)
     book_frequencies = book_frequencies_by_word(occurrences)
@@ -48,9 +48,9 @@ def build_word_metric_rows(
     }
 
     rows: list[dict[str, str | int]] = []
-    for word, book_count in word_counts.items():
-        word_class = word_classes[word]
-        book_frequency = book_frequencies[word]
+    for key, book_count in word_counts.items():
+        word, word_class = key
+        book_frequency = book_frequencies[key]
         stats = stats_by_word_class[word_class]
         rows.append(
             {
@@ -108,7 +108,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Prepare a traditional per-word metrics CSV with one row for each "
-            "distinct normalized word in a book."
+            "distinct normalized word/class pair in a book."
         )
     )
     parser.add_argument("input_txt", type=Path, help="Path to a .txt book file.")

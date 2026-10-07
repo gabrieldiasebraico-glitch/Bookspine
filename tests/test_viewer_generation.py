@@ -143,7 +143,7 @@ class ViewerStateConcurrencyTests(unittest.TestCase):
         count_lock = threading.Lock()
         results = []
 
-        def controlled_metric_values(rows, metric, class_discrimination):
+        def controlled_metric_values(rows, metric, class_discrimination, frequency_basis="token"):
             nonlocal calculation_count
             with count_lock:
                 calculation_count += 1

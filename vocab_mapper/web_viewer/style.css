@@ -132,6 +132,16 @@ body {
   flex: 0 1 250px;
 }
 
+.toolbar .frequency-basis-field {
+  flex: 0 1 230px;
+}
+
+.frequency-basis-field select:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .smoothing-summary {
   color: var(--muted);
   font-size: 11px;
@@ -860,6 +870,10 @@ button:hover {
   }
 
   .toolbar .smoothing-field {
+    flex: 1 1 220px;
+  }
+
+  .toolbar .frequency-basis-field {
     flex: 1 1 220px;
   }
 

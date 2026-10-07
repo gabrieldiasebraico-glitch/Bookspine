@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
-from vocab_mapper.metric_values import row_metric_values
+from vocab_mapper.metric_values import TOKEN_FREQUENCY_BASIS, row_metric_values
 from vocab_mapper.metrics import (
     METRIC_SPECS,
     is_ngram_frequency_metric,
@@ -108,9 +108,10 @@ def metric_values(
     rows: list[dict[str, str]],
     metric: str,
     class_discrimination: bool = True,
+    frequency_basis: str = TOKEN_FREQUENCY_BASIS,
 ) -> list[float]:
     metric = resolve_metric_name(metric)
-    return row_metric_values(rows, metric, class_discrimination)
+    return row_metric_values(rows, metric, class_discrimination, frequency_basis)
 
 
 def metric_color_scale(

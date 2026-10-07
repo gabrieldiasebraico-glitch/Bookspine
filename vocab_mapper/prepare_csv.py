@@ -9,6 +9,8 @@ from pathlib import Path
 from statistics import median
 from typing import Iterable
 
+from vocab_mapper.word_classifier import classify_sentences
+
 from vocab_mapper.metrics import (
     BOOK_METRIC_FIELDNAMES,
     BOOK_NGRAM_COMPARISON_FIELDNAMES,
@@ -25,187 +27,6 @@ CHAPTER_RE = re.compile(
     r"^\s*(chapter|book|part)\s+([ivxlcdm]+|\d+|[a-z]+)\b|^\s*[ivxlcdm]+\.\s*$",
     re.IGNORECASE,
 )
-
-
-FUNCTION_WORDS = {
-    "a",
-    "about",
-    "above",
-    "after",
-    "again",
-    "against",
-    "all",
-    "am",
-    "an",
-    "and",
-    "any",
-    "are",
-    "aren't",
-    "as",
-    "at",
-    "be",
-    "because",
-    "been",
-    "before",
-    "being",
-    "below",
-    "between",
-    "both",
-    "but",
-    "by",
-    "can",
-    "can't",
-    "cannot",
-    "could",
-    "couldn't",
-    "did",
-    "didn't",
-    "do",
-    "does",
-    "doesn't",
-    "doing",
-    "don't",
-    "down",
-    "during",
-    "each",
-    "few",
-    "for",
-    "from",
-    "further",
-    "had",
-    "hadn't",
-    "has",
-    "hasn't",
-    "have",
-    "haven't",
-    "having",
-    "he",
-    "he'd",
-    "he'll",
-    "he's",
-    "her",
-    "here",
-    "here's",
-    "hers",
-    "herself",
-    "him",
-    "himself",
-    "his",
-    "how",
-    "how's",
-    "i",
-    "i'd",
-    "i'll",
-    "i'm",
-    "i've",
-    "if",
-    "in",
-    "into",
-    "is",
-    "isn't",
-    "it",
-    "it's",
-    "its",
-    "itself",
-    "let's",
-    "me",
-    "more",
-    "most",
-    "must",
-    "mustn't",
-    "my",
-    "myself",
-    "no",
-    "nor",
-    "not",
-    "of",
-    "off",
-    "on",
-    "once",
-    "only",
-    "or",
-    "other",
-    "ought",
-    "our",
-    "ours",
-    "ourselves",
-    "out",
-    "over",
-    "own",
-    "same",
-    "shan't",
-    "she",
-    "she'd",
-    "she'll",
-    "she's",
-    "should",
-    "shouldn't",
-    "so",
-    "some",
-    "such",
-    "than",
-    "that",
-    "that's",
-    "the",
-    "their",
-    "theirs",
-    "them",
-    "themselves",
-    "then",
-    "there",
-    "there's",
-    "these",
-    "they",
-    "they'd",
-    "they'll",
-    "they're",
-    "they've",
-    "this",
-    "those",
-    "through",
-    "to",
-    "too",
-    "under",
-    "until",
-    "up",
-    "very",
-    "was",
-    "wasn't",
-    "we",
-    "we'd",
-    "we'll",
-    "we're",
-    "we've",
-    "were",
-    "weren't",
-    "what",
-    "what's",
-    "when",
-    "when's",
-    "where",
-    "where's",
-    "which",
-    "while",
-    "who",
-    "who's",
-    "whom",
-    "why",
-    "why's",
-    "will",
-    "with",
-    "won't",
-    "would",
-    "wouldn't",
-    "you",
-    "you'd",
-    "you'll",
-    "you're",
-    "you've",
-    "your",
-    "yours",
-    "yourself",
-    "yourselves",
-}
 
 
 LOCATION_FIELDNAMES = [
@@ -325,12 +146,6 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
-def classify_word(normalized_word: str) -> str:
-    if normalized_word in FUNCTION_WORDS:
-        return "functional"
-    return "semantic"
-
-
 def split_paragraphs(text: str) -> list[str]:
     return [p.strip() for p in re.split(r"\n\s*\n+", text) if p.strip()]
 
@@ -368,6 +183,7 @@ def collect_occurrences(text: str) -> list[WordOccurrence]:
     chapter_number = 1
     position_in_chapter = 0
     word_number = 0
+    sentence_inputs = []
 
     for paragraph in split_paragraphs(text):
         if is_chapter_heading(paragraph) and occurrences:
@@ -386,6 +202,7 @@ def collect_occurrences(text: str) -> list[WordOccurrence]:
             if not sentence_words:
                 continue
 
+            sentence_inputs.append((sentence, sentence_words))
             sentence_number += 1
             for position_in_sentence, match in enumerate(sentence_words, start=1):
                 word = match.group(0)
@@ -401,7 +218,7 @@ def collect_occurrences(text: str) -> list[WordOccurrence]:
                         word=word,
                         normalized_word=normalized,
                         word_number=word_number,
-                        word_class=classify_word(normalized),
+                        word_class="",
                         position_in_sentence=position_in_sentence,
                         sentence_number=sentence_number,
                         position_in_paragraph=position_in_paragraph,
@@ -411,6 +228,9 @@ def collect_occurrences(text: str) -> list[WordOccurrence]:
                     )
                 )
 
+    classes = (label for labels in classify_sentences(sentence_inputs) for label in labels)
+    for occurrence, label in zip(occurrences, classes, strict=True):
+        occurrence.word_class = label
     add_scope_totals(occurrences)
     return occurrences
 
@@ -510,16 +330,16 @@ def frequency_stats(values: list[float]) -> FrequencyStats:
     )
 
 
-def word_classes_by_word(occurrences: list[WordOccurrence]) -> dict[str, str]:
+def word_classes_by_word(occurrences: list[WordOccurrence]) -> dict[tuple[str, str], str]:
     return {
-        occurrence.normalized_word: occurrence.word_class
+        (occurrence.normalized_word, occurrence.word_class): occurrence.word_class
         for occurrence in occurrences
     }
 
 
 def book_frequencies_by_word(
     occurrences: list[WordOccurrence],
-) -> dict[str, float]:
+) -> dict[tuple[str, str], float]:
     class_totals = Counter(occurrence.word_class for occurrence in occurrences)
     word_counts_by_class = Counter(
         (occurrence.word_class, occurrence.normalized_word)
@@ -527,15 +347,15 @@ def book_frequencies_by_word(
     )
 
     return {
-        word: count / class_totals[word_class]
+        (word, word_class): count / class_totals[word_class]
         for (word_class, word), count in word_counts_by_class.items()
         if class_totals[word_class]
     }
 
 
 def stats_by_class(
-    values_by_word: dict[str, float],
-    word_classes: dict[str, str],
+    values_by_word: dict[tuple[str, str], float],
+    word_classes: dict[tuple[str, str], str],
 ) -> dict[str, FrequencyStats]:
     values_by_class: dict[str, list[float]] = defaultdict(list)
     for word, word_class in word_classes.items():
@@ -561,13 +381,13 @@ def build_rows(
     book_frequencies = book_frequencies_by_word(occurrences)
     book_stats_by_class = stats_by_class(book_frequencies, word_classes)
     ngram_stats_by_label = {
-        label: stats_by_class(frequencies, word_classes)
+        label: stats_by_class({key: frequencies[key[0]] for key in word_classes if key[0] in frequencies}, word_classes)
         for label, frequencies in ngram_sources.items()
     }
 
     rows: list[dict[str, str | int]] = []
     for occurrence in occurrences:
-        book_frequency = book_frequencies.get(occurrence.normalized_word)
+        book_frequency = book_frequencies.get((occurrence.normalized_word, occurrence.word_class))
         book_stats = book_stats_by_class.get(occurrence.word_class)
         row: dict[str, str | int] = {
             "word": occurrence.word,

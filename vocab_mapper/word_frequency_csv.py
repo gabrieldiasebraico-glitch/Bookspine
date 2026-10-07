@@ -14,7 +14,6 @@ from vocab_mapper.prepare_csv import (
     format_float,
     load_ngram_frequencies,
     read_text_file,
-    word_classes_by_word,
 )
 from vocab_mapper.metrics import BOOK_FREQ
 
@@ -40,15 +39,14 @@ def build_word_frequency_rows(
     occurrences: list[WordOccurrence],
     ngram_frequencies: dict[str, float],
 ) -> list[dict[str, str | int]]:
-    word_counts = Counter(occurrence.normalized_word for occurrence in occurrences)
+    word_counts = Counter((occurrence.normalized_word, occurrence.word_class) for occurrence in occurrences)
     class_totals = Counter(occurrence.word_class for occurrence in occurrences)
-    word_classes = word_classes_by_word(occurrences)
     book_frequencies = book_frequencies_by_word(occurrences)
 
     rows: list[dict[str, str | int]] = []
-    for word, book_count in word_counts.items():
-        word_class = word_classes[word]
-        book_frequency = book_frequencies[word]
+    for key, book_count in word_counts.items():
+        word, word_class = key
+        book_frequency = book_frequencies[key]
         ngram_frequency = ngram_frequencies.get(word)
         comparison = comparison_to_ngram(book_frequency, ngram_frequency)
         rows.append(
