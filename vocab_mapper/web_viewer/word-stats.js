@@ -20,6 +20,8 @@ const highColorInput = document.getElementById("highColor");
 const statsStatusEl = document.getElementById("statsStatus");
 const statsTable = document.getElementById("statsTable");
 const kdeGroupSelect = document.getElementById("kdeGroup");
+const distributionChartSelect = document.getElementById("distributionChart");
+const histogramBinsInput = document.getElementById("histogramBins");
 const kdeMetricSelect = document.getElementById("kdeMetric");
 const kdeConfigButton = document.getElementById("kdeConfigButton");
 const kdeConfigPanel = document.getElementById("kdeConfigPanel");
@@ -355,14 +357,17 @@ function renderActiveFilters() {
 }
 
 function drawKdeChart(rows) {
+  const histogram = distributionChartSelect.value === "histogram";
+  document.getElementById("bandwidthField").classList.toggle("hidden", histogram);
+  document.getElementById("histogramBinsField").classList.toggle("hidden", !histogram);
   const { width, height } = resizeKdeCanvas();
   kdeCtx.clearRect(0, 0, width, height);
   kdeCtx.fillStyle = "#101112";
   kdeCtx.fillRect(0, 0, width, height);
 
-  const series = kdeSeries(rows);
-  if (series.points.length < 2) {
-    drawKdeMessage("No numeric KDE data");
+  const series = histogram ? histogramSeries(rows) : kdeSeries(rows);
+  if (series.points.length < (histogram ? 1 : 2)) {
+    drawKdeMessage("No numeric chart data");
     return;
   }
 
@@ -400,14 +405,31 @@ function drawKdeChart(rows) {
   kdeCtx.clip();
   kdeCtx.strokeStyle = "#d6a43a";
   kdeCtx.lineWidth = 2;
-  kdeCtx.beginPath();
-  series.points.forEach((point, index) => {
+  if (histogram) {
+    kdeCtx.fillStyle = "#d6a43a";
+    kdeCtx.beginPath();
+    series.points.forEach((point, index) => {
+      const x = xFor((point.x + point.end) / 2);
+      const y = yFor(point.y);
+      if (index === 0) kdeCtx.moveTo(x, y);
+      else kdeCtx.lineTo(x, y);
+    });
+    kdeCtx.stroke();
+    series.points.forEach((point) => {
+      kdeCtx.beginPath();
+      kdeCtx.arc(xFor((point.x + point.end) / 2), yFor(point.y), 2.5, 0, Math.PI * 2);
+      kdeCtx.fill();
+    });
+  } else {
+    kdeCtx.beginPath();
+    series.points.forEach((point, index) => {
     const x = xFor(point.x);
     const y = yFor(point.y);
     if (index === 0) kdeCtx.moveTo(x, y);
     else kdeCtx.lineTo(x, y);
-  });
-  kdeCtx.stroke();
+    });
+    kdeCtx.stroke();
+  }
 
   if (kdeMeanLineInput.checked) drawReferenceLine("mean", series.mean, xFor, margin, plotH, "#9ccfbe");
   if (kdeMedianLineInput.checked) drawReferenceLine("median", series.median, xFor, margin, plotH, "#b7b2df");
@@ -416,6 +438,37 @@ function drawKdeChart(rows) {
   kdeCtx.strokeStyle = "#737679";
   kdeCtx.strokeRect(margin.left + 0.5, margin.top + 0.5, plotW, plotH);
   drawKdeAxisLabels(kdeMetricSelect.value || "book_freq", margin, plotW, plotH, height);
+}
+
+function histogramSeries(rows) {
+  const metric = kdeMetricSelect.value || "book_freq";
+  const group = kdeGroupSelect.value;
+  const values = rows
+    .filter((row) => group === "mixed" || String(row.word_class || "").toLowerCase() === group)
+    .map((row) => ({ value: parseNumber(row[metric]), weight: parseNumber(row.book_count) }))
+    .filter((item) => item.value !== null && item.weight !== null && item.weight > 0);
+  if (!values.length) return { points: [] };
+  const minimum = values.reduce((min, item) => Math.min(min, item.value), Infinity);
+  const maximum = values.reduce((max, item) => Math.max(max, item.value), -Infinity);
+  const configuredMax = parseNumber(kdeXMaxInput.value);
+  let xMin = minimum;
+  let xMax = configuredMax !== null && configuredMax > xMin ? configuredMax : maximum;
+  if (xMax === xMin) {
+    const padding = Math.max(Math.abs(xMin) * 0.05, 1e-9);
+    xMin -= padding;
+    xMax += padding;
+  }
+  const count = Math.max(1, Math.min(200, Math.round(Number(histogramBinsInput.value) || 30)));
+  const width = (xMax - xMin) / count;
+  const points = Array.from({ length: count }, (_, index) => ({
+    x: xMin + index * width, end: xMin + (index + 1) * width, y: 0,
+  }));
+  for (const item of values) {
+    if (item.value < xMin || item.value > xMax) continue;
+    const index = Math.min(count - 1, Math.floor((item.value - xMin) / width));
+    points[index].y += item.weight;
+  }
+  return { points, xMin, xMax, mean: weightedMean(values), median: weightedMedian(values) };
 }
 
 function kdeSeries(rows) {
@@ -541,7 +594,7 @@ function drawKdeAxisLabels(xLabel, margin, plotW, plotH, height) {
   kdeCtx.fillText(xLabel, margin.left + plotW / 2, height - 10);
   kdeCtx.translate(16, margin.top + plotH / 2);
   kdeCtx.rotate(-Math.PI / 2);
-  kdeCtx.fillText("Density", 0, 0);
+    kdeCtx.fillText(distributionChartSelect.value === "histogram" ? "Token count" : "Density", 0, 0);
   kdeCtx.restore();
 }
 
@@ -627,6 +680,8 @@ for (const control of [
   midColorInput,
   highColorInput,
   kdeGroupSelect,
+  distributionChartSelect,
+  histogramBinsInput,
   kdeMetricSelect,
   kdeScaleSelect,
   kdeYScaleSelect,

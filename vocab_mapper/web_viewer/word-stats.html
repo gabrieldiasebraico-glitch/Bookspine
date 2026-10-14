@@ -99,10 +99,17 @@
         <section class="table-wrap" aria-label="Word stats table">
           <table id="statsTable"></table>
         </section>
-        <section class="kde-panel" aria-label="KDE chart">
+        <section class="kde-panel" aria-label="Word distribution chart">
           <div class="kde-toolbar">
             <label class="field">
-              <span>KDE</span>
+              <span>Chart</span>
+              <select id="distributionChart">
+                <option value="kde">Density (KDE)</option>
+                <option value="histogram">Line (token count)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Group</span>
               <select id="kdeGroup">
                 <option value="mixed">Mixed</option>
                 <option value="semantic">Semantic</option>
@@ -130,9 +137,13 @@
                 <option value="log">Log</option>
               </select>
             </label>
-            <label class="field stacked">
+            <label class="field stacked" id="bandwidthField">
               <span>Bandwidth</span>
               <input id="kdeBandwidth" type="number" min="0" step="any" placeholder="Auto (Silverman)" title="Leave blank to estimate the bandwidth automatically">
+            </label>
+            <label class="field stacked hidden" id="histogramBinsField">
+              <span>Frequency bins</span>
+              <input id="histogramBins" type="number" min="1" max="200" value="30" step="1">
             </label>
             <label class="field stacked">
               <span>X Maximum</span>
