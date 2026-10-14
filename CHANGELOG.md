@@ -19,7 +19,7 @@ Alterações em relação à versão `Alpha_0.3`.
 
 ### Escopo dos dados
 
-- A contagem usa as linhas fornecidas ao gráfico após os filtros do Word Stats. Quando a tabela estiver limitada, o gráfico representa esse subconjunto.
+- A contagem usa todas as linhas que passam pelos filtros do Word Stats, mesmo quando a tabela limita o número de linhas exibidas. O limite interno de 800 valores do KDE não se aplica ao novo gráfico de contagem.
 - O máximo de X pode excluir intervalos de valores superiores do gráfico; média e mediana continuam calculadas sobre os valores válidos do grupo selecionado.
 
 ### Validação
